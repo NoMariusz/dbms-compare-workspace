@@ -1,0 +1,103 @@
+services:
+    # --- DATABASES ---
+
+    mongodb:
+        build: ./mongodb
+        container_name: mongodb_lts
+        environment:
+            MONGO_INITDB_ROOT_USERNAME: admin
+            MONGO_INITDB_ROOT_PASSWORD: password123
+        ports:
+            - '27017:27017'
+        volumes:
+            - mongo_data:/data/db
+        # Added healthcheck to tell other containers when it's truly ready
+        healthcheck:
+            test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
+            interval: 2s
+            timeout: 5s
+            retries: 5
+
+    couchdb:
+        build: ./couchdb
+        container_name: couchdb_lts
+        environment:
+            COUCHDB_USER: admin
+            COUCHDB_PASSWORD: password123
+        ports:
+            - '5984:5984'
+        volumes:
+            - couchdb_data:/opt/couchdb/data
+
+    postgres_lts:
+        build: ./postgres_lts
+        container_name: postgres_lts
+        environment:
+            POSTGRES_USER: admin
+            POSTGRES_PASSWORD: password123
+            POSTGRES_DB: main_db
+        ports:
+            - '5432:5432'
+        volumes:
+            - pg_lts_data:/var/lib/postgresql
+
+    postgres_15:
+        build: ./postgres_15
+        container_name: postgres_15_8
+        environment:
+            POSTGRES_USER: admin
+            POSTGRES_PASSWORD: password123
+            POSTGRES_DB: legacy_db
+        ports:
+            - '5433:5432'
+        volumes:
+            - pg_15_data:/var/lib/postgresql/data
+
+    # --- WEB MANAGEMENT TOOLS ---
+
+    # --- MONGO EXPRESS ---
+    mongo-express:
+        image: mongo-express:latest
+        container_name: mongo_express
+        restart: always
+        ports:
+            - '8081:8081'
+        environment:
+            # Use these specific keys to ensure the connection string is built correctly
+            ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+            ME_CONFIG_MONGODB_ADMINPASSWORD: password123
+            ME_CONFIG_MONGODB_SERVER: mongodb
+            ME_CONFIG_MONGODB_PORT: 27017
+            ME_CONFIG_MONGODB_ENABLE_ADMIN: 'true'
+            # This is the "old school" way but often more reliable in some versions
+            ME_CONFIG_MONGODB_URL: mongodb://admin:password123@mongodb:27017/?authSource=admin
+        depends_on:
+            mongodb:
+                condition: service_healthy # Wait for the healthcheck to pass
+
+    pgadmin:
+        image: dpage/pgadmin4:latest
+        container_name: pgadmin_ui
+        restart: always
+        ports:
+            - '5050:80'
+        environment:
+            PGADMIN_DEFAULT_EMAIL: admin@example.com
+            PGADMIN_DEFAULT_PASSWORD: password123
+            # Tell pgAdmin where to look for the server definitions
+            PGADMIN_CONFIG_SERVER_MODE: 'False'
+        volumes:
+            # Mount the server definitions
+            - ./pgadmin/servers.json:/pgadmin4/servers.json
+            # Create a pgpass file so you aren't prompted for passwords
+            # Format: hostname:port:database:username:password
+            - ./pgadmin/pgpass:/tmp/pgpass
+        depends_on:
+            - postgres_lts
+            - postgres_15
+
+volumes:
+    mongo_data:
+    couchdb_data:
+    pg_lts_data:
+    pg_15_data:

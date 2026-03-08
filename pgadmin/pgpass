@@ -1,0 +1,2 @@
+postgres_lts:5432:*:admin:password123
+postgres_15:5432:*:admin:password123
