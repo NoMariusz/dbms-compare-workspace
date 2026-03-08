@@ -99,8 +99,11 @@ VALUES
 INSERT INTO
     order_status (id_status, status_name)
 VALUES
-    (1, 'Pending'),
-    (2, 'Shipped');
+    (1, 'Draft'),
+    (2, 'Waiting for a payment'),
+    (3, 'Shipment in progress'),
+    (4, 'Completed'),
+    (5, 'Cancelled');
 
 INSERT INTO
     product_types (type_name)
