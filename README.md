@@ -20,7 +20,7 @@ This project orchestrates a multi-database environment using Docker Compose. It 
     ├── mongodb/Dockerfile
     ├── couchdb/Dockerfile
     ├── postgres_lts/Dockerfile
-    └── postgres_15/Dockerfile
+    └── postgres_11/Dockerfile
     ```
 
 3. Run the following command to build and start the containers:
@@ -60,14 +60,14 @@ This project orchestrates a multi-database environment using Docker Compose. It 
 - **URL:** [http://localhost:5050](http://localhost:5050)
 - **Connect to servers:** Use the PostgreSQL passwords (password123).
 
-| Setting            | For Postgres LTS | For Postgres 15.8 |
-| ------------------ | ---------------- | ----------------- |
-| **Name**           | Postgres LTS     | Postgres 15.8     |
-| **Host**           | `postgres_lts`   | `postgres_15`     |
-| **Port**           | `5432`           | `5432`            |
-| **Maintenance DB** | `main_db`        | `legacy_db`       |
-| **Username**       | `admin`          | `admin`           |
-| **Password**       | `password123`    | `password123`     |
+| Setting            | For Postgres LTS | For Postgres 11.22 |
+| ------------------ | ---------------- | ------------------ |
+| **Name**           | Postgres LTS     | Postgres 11.22     |
+| **Host**           | `postgres_lts`   | `postgres_11`      |
+| **Port**           | `5432`           | `5432`             |
+| **Maintenance DB** | `main_db`        | `main_db`          |
+| **Username**       | `admin`          | `admin`            |
+| **Password**       | `password123`    | `password123`      |
 
 > **Note:** Because pgAdmin runs inside the Docker network, it connects using the **Service Name** and the internal port **5432**, regardless of the host port mapping.
 

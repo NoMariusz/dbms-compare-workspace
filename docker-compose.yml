@@ -43,9 +43,9 @@ services:
             - ./postgres/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/01-init-multiple-dbs.sh
             - ./postgres/sql_dumps:/opt/sql_dumps
 
-    postgres_15:
-        build: ./postgres/postgres_15
-        container_name: postgres_15_8
+    postgres_11:
+        build: ./postgres/postgres_11
+        container_name: postgres_11_22
         environment:
             POSTGRES_USER: admin
             POSTGRES_PASSWORD: password123
@@ -53,7 +53,7 @@ services:
         ports:
             - '5433:5432'
         volumes:
-            - pg_15_data:/var/lib/postgresql/data
+            - pg_11_data:/var/lib/postgresql/data
             - ./postgres/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/01-init-multiple-dbs.sh
             - ./postgres/sql_dumps:/opt/sql_dumps
 
@@ -98,10 +98,10 @@ services:
             - ./pgadmin/pgpass:/tmp/pgpass
         depends_on:
             - postgres_lts
-            - postgres_15
+            - postgres_11
 
 volumes:
     mongo_data:
     couchdb_data:
     pg_lts_data:
-    pg_15_data:
+    pg_11_data:
