@@ -37,7 +37,7 @@ This project orchestrates a multi-database environment using Docker Compose. It 
 | **MongoDB**        | 8.2 (LTS)   | `27017`   | `27017`       | `admin`      | `password123` |
 | **CouchDB**        | 3.5.1 (LTS) | `5984`    | `5984`        | `admin`      | `password123` |
 | **PostgreSQL LTS** | 18.3 (LTS)  | `5432`    | `5432`        | `admin`      | `password123` |
-| **PostgreSQL 15**  | 15.8        | `5433`    | `5432`        | `admin`      | `password123` |
+| **PostgreSQL 11**  | 11.22        | `5433`    | `5432`        | `admin`      | `password123` |
 
 ---
 
