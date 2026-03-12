@@ -7,10 +7,12 @@ services:
         environment:
             MONGO_INITDB_ROOT_USERNAME: admin
             MONGO_INITDB_ROOT_PASSWORD: password123
+            MONGO_INITDB_DATABASE: skates_shop
         ports:
             - '27017:27017'
         volumes:
             - mongo_data:/data/db
+            - ./mongodb/init:/docker-entrypoint-initdb.d
         # Added healthcheck to tell other containers when it's truly ready
         healthcheck:
             test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
@@ -28,6 +30,19 @@ services:
             - '5984:5984'
         volumes:
             - couchdb_data:/opt/couchdb/data
+            - ./couchdb/local.d:/opt/couchdb/etc/local.d
+
+    couchdb-init:
+        image: curlimages/curl:8.12.1
+        depends_on:
+            - couchdb
+        environment:
+            COUCHDB_USER: admin
+            COUCHDB_PASSWORD: password123
+            COUCHDB_DB: skates_shop
+        volumes:
+            - ./couchdb/init:/seed
+        entrypoint: ['/bin/sh', '/seed/init-couchdb.sh']
 
     postgres_lts:
         build: ./postgres/postgres_lts
