@@ -14,19 +14,40 @@ This project orchestrates a multi-database environment using Docker Compose. It 
 1. Clone this repository or copy the files into a project folder.
 2. Ensure your directory structure looks like this:
 
-    ```text
-    .
-    ├── docker-compose.yml
-    ├── mongodb/Dockerfile
-    ├── couchdb/Dockerfile
-    ├── postgres_lts/Dockerfile
-    └── postgres_11/Dockerfile
-    ```
+   ```text
+   .
+   ├── docker-compose.yml
+   │
+   ├── mongodb/
+   │   ├── Dockerfile
+   │   └── init/
+   │       ├── create-collections.js
+   │       └── indexes.js
+   │
+   ├── couchdb/
+   │   ├── Dockerfile
+   │   ├── local.d/
+   │   │   └── single-node.ini
+   │   └── init/
+   │       └── init-couchdb.sh
+   │
+   ├── postgres/
+   │   ├── postgres_lts/
+   │   │   └── Dockerfile
+   │   ├── postgres_11/
+   │   │   └── Dockerfile
+   │   ├── init-multiple-dbs.sh
+   │   └── sql_dumps/
+   │
+   └── pgadmin/
+       ├── servers.json
+       └── pgpass
+   ```
 
 3. Run the following command to build and start the containers:
-    ```bash
-    docker-compose up -d
-    ```
+   ```bash
+   docker-compose up -d
+   ```
 
 ---
 
@@ -37,7 +58,7 @@ This project orchestrates a multi-database environment using Docker Compose. It 
 | **MongoDB**        | 8.2 (LTS)   | `27017`   | `27017`       | `admin`      | `password123` |
 | **CouchDB**        | 3.5.1 (LTS) | `5984`    | `5984`        | `admin`      | `password123` |
 | **PostgreSQL LTS** | 18.3 (LTS)  | `5432`    | `5432`        | `admin`      | `password123` |
-| **PostgreSQL 11**  | 11.22        | `5433`    | `5432`        | `admin`      | `password123` |
+| **PostgreSQL 11**  | 11.22       | `5433`    | `5432`        | `admin`      | `password123` |
 
 ---
 
@@ -53,7 +74,6 @@ This project orchestrates a multi-database environment using Docker Compose. It 
 
 - **URL:** [http://localhost:5984/\_utils](http://localhost:5984/_utils)
 - **Login:** Use the CouchDB credentials (admin/password123).
-- **First Run:** Go to the "Setup" tab on the left sidebar and select **"Configure Single Node"** to initialize system databases.
 
 ### 3. PostgreSQL (via pgAdmin 4)
 
@@ -70,6 +90,26 @@ This project orchestrates a multi-database environment using Docker Compose. It 
 | **Password**       | `password123`    | `password123`      |
 
 > **Note:** Because pgAdmin runs inside the Docker network, it connects using the **Service Name** and the internal port **5432**, regardless of the host port mapping.
+
+## ⚙️ Automatic Database Initialization
+
+During the first startup, each database container initializes its schema automatically:
+
+### MongoDB
+
+Initialization scripts in `mongodb/init/` create collections and indexes inside the `skates_shop` database.
+
+### CouchDB
+
+The `couchdb-init` helper container:
+
+- waits until CouchDB becomes available
+- creates the `skates_shop` database
+- creates Mango indexes required for queries.
+
+### PostgreSQL
+
+Initialization scripts in `postgres/` load the relational schema and initial dataset into the `main_db` database.
 
 ---
 
