@@ -22,45 +22,47 @@ CREATE TABLE
     );
 
 CREATE TABLE
-    models (
-        id_model SERIAL PRIMARY KEY,
-        id_manufacturer INT REFERENCES manufacturers (id_manufacturer),
-        model_name VARCHAR(100) NOT NULL
-    );
-
-CREATE TABLE
     product_types (
         id_type SERIAL PRIMARY KEY,
         type_name VARCHAR(50) NOT NULL
     );
 
 CREATE TABLE
-    products (
-        id_product SERIAL PRIMARY KEY,
-        id_type INT REFERENCES product_types (id_type),
-        id_model INT REFERENCES models (id_model),
+    models (
+        id_model SERIAL PRIMARY KEY,
+        id_manufacturer INT REFERENCES manufacturers (id_manufacturer),
+        model_name VARCHAR(100) NOT NULL,
         description TEXT,
         release_date DATE
     );
 
 CREATE TABLE
-    product_variants (
-        id_variant SERIAL PRIMARY KEY,
-        id_product INT REFERENCES products (id_product),
-        color_name VARCHAR(50),
-        size_value VARCHAR(20),
-        stock_quantity INT NOT NULL DEFAULT 0,
-        price DECIMAL(10, 2) NOT NULL
+    models_to_product_types (
+        id_model INT REFERENCES models (id_model),
+        id_type INT REFERENCES product_types (id_type),
+        PRIMARY KEY (id_model, id_type)
     );
 
 CREATE TABLE
     gear_specifications (
-        id_product INT PRIMARY KEY REFERENCES products (id_product),
+        id_specification SERIAL PRIMARY KEY,
         wheel_size INT,
         number_of_wheels INT,
         blade_material VARCHAR(50),
         boot_material VARCHAR(50),
         bearing_type VARCHAR(50)
+    );
+
+CREATE TABLE
+    product (
+        id_product SERIAL PRIMARY KEY,
+        id_model INT REFERENCES models (id_model),
+        id_specification INT REFERENCES gear_specifications (id_specification),
+        color_name VARCHAR(50),
+        size_value VARCHAR(20),
+        stock_quantity INT NOT NULL DEFAULT 0,
+        price DECIMAL(10, 2) NOT NULL,
+        description TEXT
     );
 
 CREATE TABLE
@@ -83,8 +85,7 @@ CREATE TABLE
     order_items (
         id_order_item SERIAL PRIMARY KEY,
         id_order INT REFERENCES orders (id_order) ON DELETE CASCADE,
-        id_product INT REFERENCES products (id_product),
-        id_variant INT REFERENCES product_variants (id_variant),
+        id_product INT REFERENCES product (id_product),
         quantity INT NOT NULL,
         unit_price DECIMAL(10, 2) NOT NULL
     );
@@ -108,5 +109,9 @@ VALUES
 INSERT INTO
     product_types (type_name)
 VALUES
+    ('Man'),
+    ('Woman'),
+    ('Unisex'),
     ('In-line Skates'),
+    ('Accessories'),
     ('Ice Skates');
