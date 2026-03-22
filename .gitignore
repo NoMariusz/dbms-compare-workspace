@@ -208,3 +208,5 @@ __marimo__/
 
 # CouchDB local configuration
 couchdb/local.d/
+
+compare_app/data/db_backups/

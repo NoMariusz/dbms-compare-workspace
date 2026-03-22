@@ -12,6 +12,7 @@ This project orchestrates a multi-database environment using Docker Compose. It 
 ### Installation
 
 1. Clone this repository or copy the files into a project folder.
+   1.5. !!! download or create own db_backups files
 2. Ensure your directory structure looks like this:
 
     ```text
