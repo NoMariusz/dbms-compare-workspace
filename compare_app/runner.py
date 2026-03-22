@@ -5,6 +5,8 @@ from constants import DBDataSize
 from data_manager import DataManager
 from test_cases.base import BaseTestCase
 
+from compare_app import config
+
 
 class BenchmarkRunner:
     def __init__(self, connectors: list[BaseConnector], test_cases: list[BaseTestCase], data_manager: DataManager) -> None:
@@ -22,8 +24,12 @@ class BenchmarkRunner:
                 for connector in self.connectors:
                     connector.restore_data(size_label)
                     for test_case in self.test_cases:
-                        duration = test_case.run(connector)
-                        self.data_manager.store_result(test_case.name, connector.name, size_label, duration)
+                        # run the test case multiple times and average the duration to get more stable results
+                        full_duration = 0.0
+                        for _ in range(config.NUMER_OF_TEST_RUNS):
+                            duration = test_case.run(connector)
+                            full_duration += duration
+                        self.data_manager.store_result(test_case.name, connector.name, size_label, full_duration / config.NUMER_OF_TEST_RUNS)
         finally:
             for connector in self.connectors:
                 connector.close()

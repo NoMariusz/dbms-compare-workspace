@@ -24,7 +24,7 @@ class PostgresConnector(BaseConnector):
 
     def connect(self) -> None:
         psycopg2 = importlib.import_module("psycopg2")
-        print(f"DEBUG: Connecting to {self.dbms_type.name} at {self.host}:{self.port} as {self.user} with password {self.password} and database {self.database}")
+        print(f"DEBUG: Connecting to {self.dbms_type.name} at {self.host}:{self.port} to database {self.database}")
         self.client = psycopg2.connect(
             host=self.host,
             port=self.port,

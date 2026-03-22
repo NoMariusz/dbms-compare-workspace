@@ -14,3 +14,6 @@ TESTED_SIZES = [DBDataSize.SMALL, DBDataSize.MEDIUM, DBDataSize.LARGE]
 # dbms to perform the test cases for
 # TESTED_DBMS = [DBMSType.PostgreSQL_LTS, DBMSType.PostgreSQL_11, DBMSType.MongoDB, DBMSType.CouchDB]
 TESTED_DBMS = [DBMSType.PostgreSQL_LTS, DBMSType.PostgreSQL_11]
+
+# how many times to run each test case for each dbms and data size, to get more stable results
+NUMER_OF_TEST_RUNS = 3

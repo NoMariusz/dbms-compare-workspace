@@ -21,5 +21,6 @@ class BaseConnector(ABC):
         pass
 
     @abstractmethod
+    # restoring db with given sizes, needed for testing with different data sizes
     def restore_data(self, size_label: str) -> None:
         pass
