@@ -1,0 +1,115 @@
+from __future__ import annotations
+
+import os
+from typing import Callable
+
+import config
+from connectors.base import BaseConnector
+from connectors.couchdb import CouchConnector
+from connectors.mongodb import MongoConnector
+from connectors.postgres import PostgresConnector
+from constants import DBMSType
+from data_manager import DataManager
+from runner import BenchmarkRunner
+from test_cases.c1_insert_user import C1InsertUserTestCase
+from test_cases.r1_read_user import R1ReadUserByEmailTestCase
+
+
+def _required_env(name: str, default: str | None = None) -> str:
+	value = os.getenv(name, default)
+	if value is None:
+		raise ValueError(f"Missing required environment variable: {name}")
+	return value
+
+
+def _load_env_file(path: str) -> None:
+	if not os.path.exists(path):
+		return
+
+	with open(path, mode="r", encoding="utf-8") as env_file:
+		for line in env_file:
+			line = line.strip()
+			if not line or line.startswith("#") or "=" not in line:
+				continue
+			key, value = line.split("=", 1)
+			os.environ.setdefault(key.strip(), value.strip())
+
+
+def _build_postgres_lts() -> BaseConnector:
+	return PostgresConnector(
+		dbms_type=DBMSType.PostgreSQL_LTS,
+		host=_required_env("POSTGRES_LTS_HOST", "localhost"),
+		port=int(_required_env("POSTGRES_LTS_PORT")),
+		user=_required_env("POSTGRES_LTS_USER"),
+		password=_required_env("POSTGRES_LTS_PASSWORD"),
+	)
+
+
+def _build_postgres_11() -> BaseConnector:
+	return PostgresConnector(
+		dbms_type=DBMSType.PostgreSQL_11,
+		host=_required_env("POSTGRES_11_HOST", "localhost"),
+		port=int(_required_env("POSTGRES_11_PORT")),
+		user=_required_env("POSTGRES_11_USER"),
+		password=_required_env("POSTGRES_11_PASSWORD"),
+	)
+
+
+def _build_mongodb() -> BaseConnector:
+	return MongoConnector(
+		host=_required_env("MONGO_HOST", "localhost"),
+		port=int(_required_env("MONGO_PORT")),
+		user=_required_env("MONGO_USERNAME"),
+		password=_required_env("MONGO_PASSWORD"),
+	)
+
+
+def _build_couchdb() -> BaseConnector:
+	return CouchConnector(
+		host=_required_env("COUCHDB_HOST", "localhost"),
+		port=int(_required_env("COUCHDB_PORT")),
+		user=_required_env("COUCHDB_USERNAME"),
+		password=_required_env("COUCHDB_PASSWORD"),
+	)
+
+
+def build_connectors() -> list[BaseConnector]:
+	connector_builders: dict[DBMSType, Callable[[], BaseConnector]] = {
+		DBMSType.PostgreSQL_LTS: _build_postgres_lts,
+		DBMSType.PostgreSQL_11: _build_postgres_11,
+		DBMSType.MongoDB: _build_mongodb,
+		DBMSType.CouchDB: _build_couchdb,
+	}
+
+	connectors: list[BaseConnector] = []
+	for dbms in config.TESTED_DBMS:
+		builder = connector_builders.get(dbms)
+		if builder is None:
+			raise ValueError(f"Unsupported DBMS in config.TESTED_DBMS: {dbms}")
+		connectors.append(builder())
+
+	return connectors
+
+
+def build_test_cases() -> list:
+	return [
+		C1InsertUserTestCase(),
+		R1ReadUserByEmailTestCase(),
+	]
+
+
+def main() -> None:
+	_load_env_file(path=os.path.join(os.path.dirname(__file__), ".env"))
+
+	data_manager = DataManager()
+	runner = BenchmarkRunner(
+		connectors=build_connectors(),
+		test_cases=build_test_cases(),
+		data_manager=data_manager,
+	)
+	runner.run(config.TESTED_SIZES)
+	data_manager.save_to_csv(config.OUTPUT_FILE_PATH)
+
+
+if __name__ == "__main__":
+	main()

@@ -14,40 +14,40 @@ This project orchestrates a multi-database environment using Docker Compose. It 
 1. Clone this repository or copy the files into a project folder.
 2. Ensure your directory structure looks like this:
 
-   ```text
-   .
-   ├── docker-compose.yml
-   │
-   ├── mongodb/
-   │   ├── Dockerfile
-   │   └── init/
-   │       ├── create-collections.js
-   │       └── indexes.js
-   │
-   ├── couchdb/
-   │   ├── Dockerfile
-   │   ├── local.d/
-   │   │   └── single-node.ini
-   │   └── init/
-   │       └── init-couchdb.sh
-   │
-   ├── postgres/
-   │   ├── postgres_lts/
-   │   │   └── Dockerfile
-   │   ├── postgres_11/
-   │   │   └── Dockerfile
-   │   ├── init-multiple-dbs.sh
-   │   └── sql_dumps/
-   │
-   └── pgadmin/
-       ├── servers.json
-       └── pgpass
-   ```
+    ```text
+    .
+    ├── docker-compose.yml
+    │
+    ├── mongodb/
+    │   ├── Dockerfile
+    │   └── init/
+    │       ├── create-collections.js
+    │       └── indexes.js
+    │
+    ├── couchdb/
+    │   ├── Dockerfile
+    │   ├── local.d/
+    │   │   └── single-node.ini
+    │   └── init/
+    │       └── init-couchdb.sh
+    │
+    ├── postgres/
+    │   ├── postgres_lts/
+    │   │   └── Dockerfile
+    │   ├── postgres_11/
+    │   │   └── Dockerfile
+    │   ├── init-multiple-dbs.sh
+    │   └── sql_dumps/
+    │
+    └── pgadmin/
+        ├── servers.json
+        └── pgpass
+    ```
 
 3. Run the following command to build and start the containers:
-   ```bash
-   docker-compose up -d
-   ```
+    ```bash
+    docker-compose up -d
+    ```
 
 ---
 
@@ -110,6 +110,100 @@ The `couchdb-init` helper container:
 ### PostgreSQL
 
 Initialization scripts in `postgres/` load the relational schema and initial dataset into the `main_db` database.
+
+---
+
+## 📈 Compare App (Benchmark Module)
+
+The `compare_app/` folder contains a Python benchmark runner that executes selected test cases against selected DBMS engines and exports timing results to CSV.
+
+### Module overview
+
+```text
+compare_app/
+├── main.py                  # entry point and connector/test registration
+├── config.py                # tested sizes, tested dbms, output path, db names
+├── constants.py             # enums and size labels
+├── runner.py                # BenchmarkRunner loop (size -> connector -> test)
+├── data_manager.py          # in-memory matrix + CSV export
+├── connectors/
+│   ├── base.py              # BaseConnector lifecycle interface
+│   ├── postgres.py          # PostgreSQL implementation (raw SQL CRUD methods)
+│   ├── mongodb.py           # Mongo lifecycle + mocked restore
+│   └── couchdb.py           # Couch lifecycle + mocked restore
+└── test_cases/
+    ├── base.py              # BaseTestCase dispatch + timing
+    ├── c1_insert_user.py    # sample create test
+    └── r1_read_user.py      # sample read test
+```
+
+### Main elements and flow
+
+1. `main.py` loads `compare_app/.env` and constructs connectors from `config.TESTED_DBMS`.
+2. `BenchmarkRunner` connects once, then runs nested loops:
+   size -> connector -> test case.
+3. Each test case is timed with `time.perf_counter()`.
+4. Results are stored by `DataManager` and exported to `config.OUTPUT_FILE_PATH`.
+
+### Current status
+
+- PostgreSQL test branches are implemented and use simple raw SQL methods from `PostgresConnector`.
+- MongoDB and CouchDB branches in sample test cases currently raise `NotImplementedError` intentionally.
+- `restore_data(size_label)` is mocked in each connector and currently prints debug output.
+
+### How to run compare_app
+
+1. Start containers:
+    ```bash
+    docker-compose up -d
+    ```
+2. Install Python dependencies:
+    ```bash
+    pip install -r compare_app/requirements.txt
+    ```
+3. Run the benchmark app:
+    ```bash
+    cd compare_app
+    python main.py
+    ```
+4. Check CSV output at the path from `config.OUTPUT_FILE_PATH` (default `./data/base_results.csv`).
+
+### Configuration points
+
+- `compare_app/config.py`
+    - `TESTED_DBMS`: chooses which connectors are instantiated
+    - `TESTED_SIZES`: chooses benchmark size levels
+    - `OUTPUT_FILE_PATH`: output CSV location
+- `compare_app/.env`
+    - DB connection credentials and ports
+    - optional host overrides (defaults to `localhost` in `main.py`)
+
+### How to add a new test case
+
+1. Create a new file in `compare_app/test_cases/` (for example `u1_update_user.py`).
+2. Inherit from `BaseTestCase` and set a unique `name`.
+3. Implement:
+    - `run_for_postgresql`
+    - `run_for_mongodb`
+    - `run_for_couchdb`
+4. If a branch is not ready yet, raise `NotImplementedError` explicitly.
+5. Register the class in `build_test_cases()` in `compare_app/main.py`.
+
+### How to extend connector capabilities
+
+- PostgreSQL:
+    - Add methods in `compare_app/connectors/postgres.py` that accept SQL query + params.
+    - Keep query semantics in test cases, connector methods focused on execution.
+- MongoDB / CouchDB:
+    - Add DB-specific helper methods directly in each connector when needed by tests.
+    - Then replace `NotImplementedError` branches in test cases with concrete calls.
+
+### How to scale toward more scenarios
+
+- Keep each scenario in a separate file under `test_cases/`.
+- Reuse seeded deterministic test data (emails/ids) to make runs repeatable.
+- When real data presets are ready, replace mocked `restore_data` with actual reset/import scripts per connector.
+- For fair comparison, keep each test case semantically equivalent across DBMS branches.
 
 ---
 
