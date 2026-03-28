@@ -20,7 +20,29 @@ class R1ReadUserByEmailTestCase(BaseTestCase):
         )
 
     def run_for_mongodb(self, connector: MongoConnector) -> None:
-        raise NotImplementedError("run_for_mongodb is not implemented yet")
+        connector.read_one(
+            collection_name="users",
+            filter_query={"email": "benchmark_user@example.com"},
+            projection={
+                "_id": 0,
+                "id_user": 1,
+                "username": 1,
+                "email": 1,
+                "phone": 1,
+                "id_role": 1,
+            },
+        )
 
     def run_for_couchdb(self, connector: CouchConnector) -> None:
-        raise NotImplementedError("run_for_couchdb is not implemented yet")
+        connector.read_one(
+            collection_name="users",
+            filter_query={"email": "benchmark_user@example.com"},
+            projection={
+                "_id": 0,
+                "id_user": 1,
+                "username": 1,
+                "email": 1,
+                "phone": 1,
+                "id_role": 1,
+            },
+        )

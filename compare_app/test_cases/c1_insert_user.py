@@ -41,7 +41,15 @@ class C1InsertUserTestCase(BaseTestCase):
         )
 
     def run_for_mongodb(self, connector: MongoConnector) -> None:
-        raise NotImplementedError("run_for_mongodb is not implemented yet")
+        payload = dict(self._payload())
+        payload.pop("type", None)
+        connector.insert_one_ignore_duplicates(
+            collection_name="users",
+            document=payload,
+        )
 
     def run_for_couchdb(self, connector: CouchConnector) -> None:
-        raise NotImplementedError("run_for_couchdb is not implemented yet")
+        connector.insert_one_ignore_duplicates(
+            collection_name="users",
+            document=self._payload(),
+        )
