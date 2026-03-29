@@ -21,6 +21,12 @@ from test_cases.c5_create_order_with_one_item import \
     C5CreateOrderWithOneItemTestCase
 from test_cases.c6_bulk_add_order_items import C6BulkAddOrderItemsTestCase
 from test_cases.r1_read_user import R1ReadUserByEmailTestCase
+from test_cases.r2_list_products_by_type import R2ListProductsByTypeTestCase
+from test_cases.r3_search_products_by_manufacturer import \
+    R3SearchProductsByManufacturerTestCase
+from test_cases.r4_product_details_card import R4ProductDetailsCardTestCase
+from test_cases.r5_user_order_history import R5UserOrderHistoryTestCase
+from test_cases.r6_stale_inventory_report import R6StaleInventoryReportTestCase
 
 
 def _required_env(name: str, default: str | None = None) -> str:
@@ -108,6 +114,11 @@ def build_test_cases() -> list:
 		C5CreateOrderWithOneItemTestCase(),
 		C6BulkAddOrderItemsTestCase(),
 		R1ReadUserByEmailTestCase(),
+		R2ListProductsByTypeTestCase(),
+		R3SearchProductsByManufacturerTestCase(),
+		R4ProductDetailsCardTestCase(),
+		R5UserOrderHistoryTestCase(),
+		R6StaleInventoryReportTestCase(),
 	]
 
 
