@@ -20,6 +20,16 @@ from test_cases.c4_insert_product_variant import C4InsertProductVariantTestCase
 from test_cases.c5_create_order_with_one_item import \
     C5CreateOrderWithOneItemTestCase
 from test_cases.c6_bulk_add_order_items import C6BulkAddOrderItemsTestCase
+from test_cases.d1_delete_order_with_items import \
+    D1DeleteOrderWithItemsTestCase
+from test_cases.d2_delete_product_variant import D2DeleteProductVariantTestCase
+from test_cases.d3_delete_order_item import D3DeleteOrderItemTestCase
+from test_cases.d4_delete_user_without_orders import \
+    D4DeleteUserWithoutOrdersTestCase
+from test_cases.d5_withdraw_model_from_offer import \
+    D5WithdrawModelFromOfferTestCase
+from test_cases.d6_cleanup_stale_zero_stock_variants import \
+    D6CleanupStaleZeroStockVariantsTestCase
 from test_cases.r1_read_user import R1ReadUserByEmailTestCase
 from test_cases.r2_list_products_by_type import R2ListProductsByTypeTestCase
 from test_cases.r3_search_products_by_manufacturer import \
@@ -134,6 +144,12 @@ def build_test_cases() -> list:
 		U4UpdateOrderStatusTestCase(),
 		U5UpdateProductDescriptionTestCase(),
 		U6UpdateShippingAddressTestCase(),
+		D1DeleteOrderWithItemsTestCase(),
+		D2DeleteProductVariantTestCase(),
+		D3DeleteOrderItemTestCase(),
+		D4DeleteUserWithoutOrdersTestCase(),
+		D5WithdrawModelFromOfferTestCase(),
+		D6CleanupStaleZeroStockVariantsTestCase(),
 	]
 
 

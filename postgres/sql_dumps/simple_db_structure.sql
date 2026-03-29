@@ -30,7 +30,7 @@ CREATE TABLE
 CREATE TABLE
     models (
         id_model SERIAL PRIMARY KEY,
-        id_manufacturer INT REFERENCES manufacturers (id_manufacturer),
+        id_manufacturer INT REFERENCES manufacturers (id_manufacturer) ON DELETE CASCADE,
         model_name VARCHAR(100) NOT NULL,
         description TEXT,
         release_date DATE
@@ -38,8 +38,8 @@ CREATE TABLE
 
 CREATE TABLE
     models_to_product_types (
-        id_model INT REFERENCES models (id_model),
-        id_type INT REFERENCES product_types (id_type),
+        id_model INT REFERENCES models (id_model) ON DELETE CASCADE,
+        id_type INT REFERENCES product_types (id_type) ON DELETE CASCADE,
         PRIMARY KEY (id_model, id_type)
     );
 
@@ -56,8 +56,8 @@ CREATE TABLE
 CREATE TABLE
     product (
         id_product SERIAL PRIMARY KEY,
-        id_model INT REFERENCES models (id_model),
-        id_specification INT REFERENCES gear_specifications (id_specification),
+        id_model INT REFERENCES models (id_model) ON DELETE CASCADE,
+        id_specification INT REFERENCES gear_specifications (id_specification) ON DELETE CASCADE,
         color_name VARCHAR(50),
         size_value VARCHAR(20),
         stock_quantity INT NOT NULL DEFAULT 0,
@@ -74,7 +74,7 @@ CREATE TABLE
 CREATE TABLE
     orders (
         id_order SERIAL PRIMARY KEY,
-        id_user INT REFERENCES users (id_user),
+        id_user INT REFERENCES users (id_user) ON DELETE RESTRICT, -- Prevent deletion of users with existing orders, they shopuld be archived
         id_status INT REFERENCES order_status (id_status),
         order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         total_amount DECIMAL(10, 2) NOT NULL,

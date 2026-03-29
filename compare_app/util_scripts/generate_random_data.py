@@ -407,7 +407,7 @@ def parse_args() -> argparse.Namespace:
 	parser.add_argument("--reset", action="store_true", help="truncate generated tables before inserts")
 	return parser.parse_args()
 
-# Populate db: py util_scripts\generate_random_data.py --size 500000 --target lts --batch-size 1000 --reset
+# Populate db: py util_scripts\generate_random_data.py --size 500000 --target lts --batch-size 5000 --reset
 """
 Create backup:
 For PostgreSQL LTS (18):
