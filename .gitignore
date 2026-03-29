@@ -210,4 +210,4 @@ __marimo__/
 couchdb/local.d/
 
 compare_app/data/db_backups/
-compare_app/data/base_results.csv
+compare_app/data/results/
