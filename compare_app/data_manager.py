@@ -3,7 +3,6 @@ from __future__ import annotations
 import csv
 import os
 from collections import defaultdict
-from typing import Any
 
 
 class DataManager:
@@ -27,18 +26,13 @@ class DataManager:
             }
         )
 
-        columns: list[tuple[str, str]] = []
-        for size in size_order:
-            for connector in connector_order:
-                columns.append((size, connector))
-
-        header = ["TestCase"] + [f"{connector}_{size}" for size, connector in columns]
-
         with open(output_file_path, mode="w", newline="", encoding="utf-8") as csv_file:
             writer = csv.writer(csv_file)
-            writer.writerow(header)
+            writer.writerow(["test", "dbms", "size", "duration"])
             for test_name in tests:
-                row: list[Any] = [test_name]
-                for size, connector in columns:
-                    row.append(self._matrix[test_name].get(size, {}).get(connector))
-                writer.writerow(row)
+                for size in size_order:
+                    for connector in connector_order:
+                        duration = self._matrix[test_name].get(size, {}).get(connector)
+                        if duration is None:
+                            continue
+                        writer.writerow([test_name, connector, size, duration])
