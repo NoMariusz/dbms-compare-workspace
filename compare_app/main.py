@@ -12,6 +12,14 @@ from constants import DBMSType
 from data_manager import DataManager
 from runner import BenchmarkRunner
 from test_cases.c1_insert_user import C1InsertUserTestCase
+from test_cases.c2_insert_manufacturer_model import \
+    C2InsertManufacturerModelTestCase
+from test_cases.c3_insert_product_with_specification import \
+    C3InsertProductWithSpecificationTestCase
+from test_cases.c4_insert_product_variant import C4InsertProductVariantTestCase
+from test_cases.c5_create_order_with_one_item import \
+    C5CreateOrderWithOneItemTestCase
+from test_cases.c6_bulk_add_order_items import C6BulkAddOrderItemsTestCase
 from test_cases.r1_read_user import R1ReadUserByEmailTestCase
 
 
@@ -94,6 +102,11 @@ def build_connectors() -> list[BaseConnector]:
 def build_test_cases() -> list:
 	return [
 		C1InsertUserTestCase(),
+		C2InsertManufacturerModelTestCase(),
+		C3InsertProductWithSpecificationTestCase(),
+		C4InsertProductVariantTestCase(),
+		C5CreateOrderWithOneItemTestCase(),
+		C6BulkAddOrderItemsTestCase(),
 		R1ReadUserByEmailTestCase(),
 	]
 
