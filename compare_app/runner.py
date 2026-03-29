@@ -31,12 +31,14 @@ class BenchmarkRunner:
                         for _ in range(NUMER_OF_TEST_RUNS):
                             duration = test_case.run(connector)
                             full_duration += duration
+                        # strore average duration in seconds just after the tests ended
+                        average_duration = full_duration / NUMER_OF_TEST_RUNS
 
                         self.data_manager.store_result(
                             test_case.name,
                             connector.name,
                             size_label,
-                            full_duration / NUMER_OF_TEST_RUNS,
+                            average_duration,
                         )
         finally:
             for connector in self.connectors:
