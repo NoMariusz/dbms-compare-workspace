@@ -27,6 +27,15 @@ from test_cases.r3_search_products_by_manufacturer import \
 from test_cases.r4_product_details_card import R4ProductDetailsCardTestCase
 from test_cases.r5_user_order_history import R5UserOrderHistoryTestCase
 from test_cases.r6_stale_inventory_report import R6StaleInventoryReportTestCase
+from test_cases.u1_update_user_contact import U1UpdateUserContactTestCase
+from test_cases.u2_update_variant_price import U2UpdateVariantPriceTestCase
+from test_cases.u3_reduce_variant_stock_after_sale import \
+    U3ReduceVariantStockAfterSaleTestCase
+from test_cases.u4_update_order_status import U4UpdateOrderStatusTestCase
+from test_cases.u5_update_product_description import \
+    U5UpdateProductDescriptionTestCase
+from test_cases.u6_update_shipping_address import \
+    U6UpdateShippingAddressTestCase
 
 
 def _required_env(name: str, default: str | None = None) -> str:
@@ -107,18 +116,24 @@ def build_connectors() -> list[BaseConnector]:
 
 def build_test_cases() -> list:
 	return [
-		C1InsertUserTestCase(),
-		C2InsertManufacturerModelTestCase(),
-		C3InsertProductWithSpecificationTestCase(),
-		C4InsertProductVariantTestCase(),
-		C5CreateOrderWithOneItemTestCase(),
-		C6BulkAddOrderItemsTestCase(),
 		R1ReadUserByEmailTestCase(),
 		R2ListProductsByTypeTestCase(),
 		R3SearchProductsByManufacturerTestCase(),
 		R4ProductDetailsCardTestCase(),
 		R5UserOrderHistoryTestCase(),
 		R6StaleInventoryReportTestCase(),
+		C1InsertUserTestCase(),
+		C2InsertManufacturerModelTestCase(),
+		C3InsertProductWithSpecificationTestCase(),
+		C4InsertProductVariantTestCase(),
+		C5CreateOrderWithOneItemTestCase(),
+		C6BulkAddOrderItemsTestCase(),
+		U1UpdateUserContactTestCase(),
+		U2UpdateVariantPriceTestCase(),
+		U3ReduceVariantStockAfterSaleTestCase(),
+		U4UpdateOrderStatusTestCase(),
+		U5UpdateProductDescriptionTestCase(),
+		U6UpdateShippingAddressTestCase(),
 	]
 
 
