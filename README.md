@@ -206,6 +206,28 @@ compare_app/
 - When real data presets are ready, replace mocked `restore_data` with actual reset/import scripts per connector.
 - For fair comparison, keep each test case semantically equivalent across DBMS branches.
 
+### Generating data for different combinations (like indexing, roles etc.)
+
+#### For postgres
+
+- First if it is needed create new sql dump in sql_dumps dir
+- Then change init-multiple-dbs.sh to use that new dump for new db name
+- Remove containers with data
+
+```bash
+docker-compose down -v
+```
+
+- Create new containers
+
+```bash
+docker-compose up -d
+```
+
+- Add that new db in generate_all_postgresql_backups.py
+- Generate dumps for that new db using generate_all_postgresql_backups.py
+- Create data for this db by use main.py with proper --postgres-11-db and --postgres-lts-db params
+
 ---
 
 ## 🧹 Maintenance Commands

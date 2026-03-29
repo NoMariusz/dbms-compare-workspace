@@ -96,7 +96,7 @@ class PostgresConnector(BaseConnector):
 
     def _resolve_backup_path(self, size_label: str) -> Path:
         db_prefix = "postgresql_lts" if self.dbms_type == DBMSType.PostgreSQL_LTS else "postgresql_11"
-        return Path(f"./data/db_backups/{db_prefix}_{size_label}.backup")
+        return Path(f"./data/db_backups/{self.database}/{db_prefix}_{size_label}.backup")
     
     # CRUD helper methods for test cases
 

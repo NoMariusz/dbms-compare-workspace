@@ -30,14 +30,14 @@ def _env(name: str, default: str | None = None) -> str:
 	return value
 
 
-def _connect(target: str):
+def _connect(target: str, db: str) -> psycopg2.extensions.connection:
 	if target == "lts":
 		return psycopg2.connect(
 			host=_env("POSTGRES_LTS_HOST", "localhost"),
 			port=int(_env("POSTGRES_LTS_PORT", "5432")),
 			user=_env("POSTGRES_LTS_USER", "admin"),
 			password=_env("POSTGRES_LTS_PASSWORD", "password123"),
-			dbname=_env("POSTGRES_LTS_DB", "main_db"),
+			dbname=_env("POSTGRES_LTS_DB", db),
 		)
 
 	if target == "11":
@@ -46,7 +46,7 @@ def _connect(target: str):
 			port=int(_env("POSTGRES_11_PORT", "5433")),
 			user=_env("POSTGRES_11_USER", "admin"),
 			password=_env("POSTGRES_11_PASSWORD", "password123"),
-			dbname=_env("POSTGRES_11_DB", "main_db"),
+			dbname=_env("POSTGRES_11_DB", db),
 		)
 
 	raise ValueError(f"Unsupported target: {target}")
@@ -175,8 +175,8 @@ def _split_entity_sizes(size: int) -> dict[str, int]:
 	return counts
 
 
-def populate_database(size: int, target: str, batch_size: int, reset: bool) -> None:
-	conn = _connect(target)
+def populate_database(size: int, target: str, batch_size: int, reset: bool, db: str) -> None:
+	conn = _connect(target, db)
 	conn.autocommit = False
 
 	run_tag = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -402,29 +402,33 @@ def parse_args() -> argparse.Namespace:
 	parser = argparse.ArgumentParser(description="Generate random PostgreSQL data for benchmark tests")
 	parser.add_argument("--size", type=int, required=True, help="total generated row budget split across entities")
 	parser.add_argument("--target", choices=["lts", "11"], default="lts", help="postgres target instance")
+	parser.add_argument("--db", choices=["main_db", "indexed_db"], default="main_db", help="postgres database used for generation")
 	parser.add_argument("--batch-size", type=int, default=1000, help="batch size for insert operations")
 	parser.add_argument("--seed", type=int, default=None, help="optional random seed")
 	parser.add_argument("--reset", action="store_true", help="truncate generated tables before inserts")
 	return parser.parse_args()
 
-# Populate db: py util_scripts\generate_random_data.py --size 500000 --target lts --batch-size 5000 --reset
+# Populate db: py util_scripts\generate_random_data.py --size 500000 --target lts --batch-size 5000 --reset --db main_db
+# Rr other possibilities:
+# py util_scripts\generate_random_data.py --size 500000 --target lts --batch-size 5000 --reset --db indexed_db
+# py util_scripts\generate_random_data.py --size 500000 --target 11 --batch-size 5000 --reset --db main_db
+# py util_scripts\generate_random_data.py --size 500000 --target 11 --batch-size 5000 --reset --db indexed_db
+# py util_scripts\generate_random_data.py --size 1000000 --target lts --batch-size 5000 --reset --db main_db
+# ...
 """
 Create backup:
-For PostgreSQL LTS (18):
 
 Create dump inside postgres_lts container:
-docker exec -e PGPASSWORD=password123 postgres_lts pg_dump -U admin -d main_db -Fc -f /tmp/main_db_lts.backup
+docker exec -e PGPASSWORD=password123 postgres_lts pg_dump -U admin -d main_db -Fc -f /tmp/database.backup
+Or other possibilities:
+docker exec -e PGPASSWORD=password123 postgres_lts pg_dump -U admin -d indexed_db -Fc -f /tmp/database.backup
+docker exec -e PGPASSWORD=password123 postgres_11_22 pg_dump -U admin -d main_db -Fc -f /tmp/database.backup
+docker exec -e PGPASSWORD=password123 postgres_11_22 pg_dump -U admin -d indexed_db -Fc -f /tmp/database.backup
 
 Copy file to host:
-docker cp postgres_lts:/tmp/main_db_lts.backup ./tmp.backup
-
-For PostgreSQL 11:
-
-Create dump inside postgres_11_22 container:
-docker exec -e PGPASSWORD=password123 postgres_11_22 pg_dump -U admin -d main_db -Fc -f /tmp/main_db_11.backup
-
-Copy file to host:
-docker cp postgres_11_22:/tmp/main_db_11.backup ./tmp.backup
+docker cp postgres_lts:/tmp/database.backup ./tmp.backup
+Or other possibilities:
+docker cp postgres_11_22:/tmp/database.backup ./tmp.backup
 """
 
 def main() -> None:
@@ -445,6 +449,7 @@ def main() -> None:
 		target=args.target,
 		batch_size=args.batch_size,
 		reset=args.reset,
+		db=args.db,
 	)
 	print(f"Data generation finished for target={args.target}, size={args.size}")
 
