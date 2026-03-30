@@ -402,7 +402,7 @@ def parse_args() -> argparse.Namespace:
 	parser = argparse.ArgumentParser(description="Generate random PostgreSQL data for benchmark tests")
 	parser.add_argument("--size", type=int, required=True, help="total generated row budget split across entities")
 	parser.add_argument("--target", choices=["lts", "11"], default="lts", help="postgres target instance")
-	parser.add_argument("--db", choices=["main_db", "indexed_db"], default="main_db", help="postgres database used for generation")
+	parser.add_argument("--db", choices=["main_db", "indexed_db", "roles_db"], default="main_db", help="postgres database used for generation")
 	parser.add_argument("--batch-size", type=int, default=1000, help="batch size for insert operations")
 	parser.add_argument("--seed", type=int, default=None, help="optional random seed")
 	parser.add_argument("--reset", action="store_true", help="truncate generated tables before inserts")

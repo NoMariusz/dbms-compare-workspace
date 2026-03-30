@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,13 @@ class PostgresConnector(BaseConnector):
             self.database = config.POSTGRES_LTS_DB
         else:
             self.database = config.POSTGRES_11_DB
+        
+        self.admin_user = self.user
+        self.admin_password = self.password
+
+        if self.database == "roles_db":
+            self.user = os.getenv("POSTGRES_ROLES_DB_USER", "moderator_user")
+            self.password = os.getenv("POSTGRES_ROLES_DB_PASSWORD", "moderator_password123")
 
     def connect(self) -> None:
         psycopg2 = importlib.import_module("psycopg2")
@@ -64,7 +72,7 @@ class PostgresConnector(BaseConnector):
 
         restore_cmd = (
             "pg_restore "
-            f"-U {self.user} "
+            f"-U {self.admin_user} "
             f"-d {self.database} "
             "--clean --if-exists --no-owner --no-privileges "
             f"{container_backup_path}"
@@ -76,7 +84,7 @@ class PostgresConnector(BaseConnector):
                 "docker",
                 "exec",
                 "-e",
-                f"PGPASSWORD={self.password}",
+                f"PGPASSWORD={self.admin_password}",
                 container_name,
                 "sh",
                 "-lc",

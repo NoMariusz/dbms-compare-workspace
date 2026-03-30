@@ -3,8 +3,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-DB_NAMES = ["main_db", "indexed_db"]
-# DB_NAMES = ["main_db"]
+DB_NAMES = ["main_db", "indexed_db", "roles_db"]
+# DB_NAMES = ["roles_db"]
 TARGETS = ["lts", "11"]
 # TARGETS = ["11"]
 TARGET_CONTAINER_NAMES = ["lts", "11_22"]
