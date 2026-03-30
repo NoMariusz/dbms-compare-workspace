@@ -1,4 +1,4 @@
-# Multi-Database Docker Environment
+# Multi-Database Docker Environment for dbms performance testing
 
 This project orchestrates a multi-database environment using Docker Compose. It includes NoSQL (MongoDB, CouchDB) and Relational (PostgreSQL) databases, each paired with a web-based management interface.
 
@@ -12,43 +12,33 @@ This project orchestrates a multi-database environment using Docker Compose. It 
 ### Installation
 
 1. Clone this repository or copy the files into a project folder.
-   1.5. !!! download or create own db_backups files
-2. Ensure your directory structure looks like this:
-
-    ```text
-    .
-    ├── docker-compose.yml
-    │
-    ├── mongodb/
-    │   ├── Dockerfile
-    │   └── init/
-    │       ├── create-collections.js
-    │       └── indexes.js
-    │
-    ├── couchdb/
-    │   ├── Dockerfile
-    │   ├── local.d/
-    │   │   └── single-node.ini
-    │   └── init/
-    │       └── init-couchdb.sh
-    │
-    ├── postgres/
-    │   ├── postgres_lts/
-    │   │   └── Dockerfile
-    │   ├── postgres_11/
-    │   │   └── Dockerfile
-    │   ├── init-multiple-dbs.sh
-    │   └── sql_dumps/
-    │
-    └── pgadmin/
-        ├── servers.json
-        └── pgpass
-    ```
-
-3. Run the following command to build and start the containers:
+2. Run the following command to build and start the containers:
     ```bash
     docker-compose up -d
     ```
+3. Create venv for ./compare_app
+4. Install pip packages from requirements.txt file
+5. Fill .env file, example content:
+    ```
+    # PostgreSQL lts connection configuration
+    POSTGRES_LTS_USER=admin
+    POSTGRES_LTS_PASSWORD=password123
+    POSTGRES_LTS_PORT=15432
+    # PostgreSQLv11 connection configuration
+    POSTGRES_11_USER=admin
+    POSTGRES_11_PASSWORD=password123
+    POSTGRES_11_PORT=15433
+    # MongoDB connection configuration
+    MONGO_USERNAME=admin
+    MONGO_PASSWORD=password123
+    MONGO_PORT=27017
+    # CouchDB connection configuration
+    COUCHDB_USERNAME=admin
+    COUCHDB_PASSWORD=password123
+    COUCHDB_PORT=5984
+    ```
+6. Download or generate new db_backups using for example compare_app\util_scripts\generate_all_postgresql_backups.py
+7. You can run tests and produre results CSV file by using main.py file
 
 ---
 
