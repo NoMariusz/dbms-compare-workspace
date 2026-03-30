@@ -125,7 +125,7 @@ def build_connectors() -> list[BaseConnector]:
 
 
 def build_test_cases() -> list:
-	return [
+	all_test_cases = [
 		R1ReadUserByEmailTestCase(),
 		R2ListProductsByTypeTestCase(),
 		R3SearchProductsByManufacturerTestCase(),
@@ -151,6 +151,20 @@ def build_test_cases() -> list:
 		D5WithdrawModelFromOfferTestCase(),
 		D6CleanupStaleZeroStockVariantsTestCase(),
 	]
+
+	requested_names = config.TESTED_TEST_CASE_NAMES
+	if not requested_names:
+		return all_test_cases
+
+	available_by_name = {test_case.name: test_case for test_case in all_test_cases}
+	unknown_names = [name for name in requested_names if name not in available_by_name]
+	if unknown_names:
+		available_names = sorted(available_by_name.keys())
+		raise ValueError(
+			f"Unknown test case names: {unknown_names}. Available names: {available_names}"
+		)
+
+	return [available_by_name[name] for name in requested_names]
 
 
 def main() -> None:
