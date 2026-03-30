@@ -9,14 +9,37 @@ from test_cases.base import BaseTestCase
 class D1DeleteOrderWithItemsTestCase(BaseTestCase):
     def __init__(self) -> None:
         super().__init__(name="d1_delete_order_with_items")
+        self.order_id_to_delete: int | None = None
 
-    def _payload(self) -> dict[str, object]:
-        return {
-            "target_order_id": 1,
-        }
+    def prepare_for_postgresql(self, connector: PostgresConnector) -> None:
+        inserted_order = connector.read_row(
+            query=(
+                "WITH selected_user AS ("
+                "SELECT id_user FROM users ORDER BY id_user DESC LIMIT 1"
+                "), selected_product AS ("
+                "SELECT id_product, price FROM product ORDER BY id_product DESC LIMIT 1"
+                "), new_order AS ("
+                "INSERT INTO orders (id_user, id_status, total_amount, shipping_address) "
+                "SELECT selected_user.id_user, 1, selected_product.price, %s "
+                "FROM selected_user CROSS JOIN selected_product "
+                "RETURNING id_order"
+                "), inserted_item AS ("
+                "INSERT INTO order_items (id_order, id_product, quantity, unit_price) "
+                "SELECT new_order.id_order, selected_product.id_product, 1, selected_product.price "
+                "FROM new_order CROSS JOIN selected_product "
+                "RETURNING id_order"
+                ") "
+                "SELECT id_order FROM new_order LIMIT 1"
+            ),
+            params=("benchmark_d1_delete_order_with_items",),
+        )
+        if not inserted_order:
+            raise ValueError("Failed to prepare D1 test case: could not insert order")
+        self.order_id_to_delete = int(inserted_order["id_order"])
 
     def run_for_postgresql(self, connector: PostgresConnector) -> None:
-        payload = self._payload()
+        if self.order_id_to_delete is None:
+            raise ValueError("D1 test case is not prepared: missing order id to delete")
         # items will be deleted because ON CASCADE is set for the foreign key constraint between order_items and orders
         connector.delete_rows(
             query=(
@@ -24,7 +47,7 @@ class D1DeleteOrderWithItemsTestCase(BaseTestCase):
                 "WHERE id_order = %s"
             ),
             params=(
-                payload["target_order_id"],
+                self.order_id_to_delete,
             ),
         )
 

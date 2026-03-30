@@ -25,10 +25,12 @@ class BenchmarkRunner:
 
                     for test_case in self.test_cases:
                         # warm-up run not included in final score
+                        test_case.prepare(connector)
                         test_case.run(connector)
 
                         full_duration = 0.0
                         for _ in range(NUMER_OF_TEST_RUNS):
+                            test_case.prepare(connector)
                             duration = test_case.run(connector)
                             full_duration += duration
                         # strore average duration in seconds just after the tests ended

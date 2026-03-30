@@ -38,3 +38,27 @@ class BaseTestCase(ABC):
     @abstractmethod
     def run_for_couchdb(self, connector: CouchConnector) -> None:
         pass
+
+    
+    def prepare(self, connector: BaseConnector) -> None:
+        """Optional method to prepare the database before running the test case.
+        This can be used to set up necessary data or state for the test case.
+        By default, it does nothing, but it can be overridden by specific test cases if needed.
+        """
+        if type(connector) == PostgresConnector:
+            self.prepare_for_postgresql(connector)
+        elif type(connector) == MongoConnector:
+            self.prepare_for_mongodb(connector)
+        elif type(connector) == CouchConnector:
+            self.prepare_for_couchdb(connector)
+        else:
+            raise ValueError(f"Unsupported DBMS type: {connector.dbms_type}")
+        
+    def prepare_for_postgresql(self, connector: PostgresConnector) -> None:
+        pass
+
+    def prepare_for_mongodb(self, connector: MongoConnector) -> None:
+        pass
+
+    def prepare_for_couchdb(self, connector: CouchConnector) -> None:
+        pass
