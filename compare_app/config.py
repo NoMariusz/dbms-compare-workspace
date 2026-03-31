@@ -28,6 +28,7 @@ TESTED_TEST_CASE_NAMES = _DEFAULT_TEST_CASES
 python main.py --postgres-lts-db main_db --output-path ./data/results/base_results_alt.csv --sizes 500k 1m --dbms PostgreSQL_LTS --test-runs 5 --test-cases r1_read_user_by_email r2_list_products_by_type
 python main.py --output-path ./data/results/simple_results_non_indexed.csv --sizes 500k --dbms PostgreSQL_LTS PostgreSQL_11 --test-runs 5
 python main.py --postgres-lts-db indexed_db --output-path ./data/results/results_format_v2.csv --sizes 500k 1m --dbms PostgreSQL_LTS --test-runs 5
+python main.py --postgres-lts-db encrypted_db --output-path ./data/results/results_encrypted.csv --sizes 500k 1m --dbms PostgreSQL_LTS --test-runs 5
 """
 
 def _parse_arguments(argv=None):

@@ -15,6 +15,7 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -f /
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
     CREATE DATABASE indexed_db;
     CREATE DATABASE roles_db;
+    CREATE DATABASE encrypted_db;
 EOSQL
 
 # 4. Import indexed_db_structure into the new 'indexed_db'
@@ -24,3 +25,7 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "indexed_db" -f /op
 # 5. Import roles_db_structure into the new 'roles_db'
 echo "Importing roles_db_structure.sql into roles_db..."
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "roles_db" -f /opt/sql_dumps/roles_db_structure.sql
+
+# 6. Import encrypted_db_structure into the new 'encrypted_db'
+echo "Importing encrypted_db_structure.sql into encrypted_db..."
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "encrypted_db" -f /opt/sql_dumps/encrypted_db_structure.sql

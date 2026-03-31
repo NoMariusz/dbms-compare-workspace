@@ -29,6 +29,9 @@ class PostgresConnector(BaseConnector):
         if self.database == "roles_db":
             self.user = os.getenv("POSTGRES_ROLES_DB_USER", "moderator_user")
             self.password = os.getenv("POSTGRES_ROLES_DB_PASSWORD", "moderator_password123")
+        
+        # Track if this is an encrypted database for query rewriting
+        self.is_encrypted_db = self.database == "encrypted_db"
 
     def connect(self) -> None:
         psycopg2 = importlib.import_module("psycopg2")
@@ -106,13 +109,32 @@ class PostgresConnector(BaseConnector):
         db_prefix = "postgresql_lts" if self.dbms_type == DBMSType.PostgreSQL_LTS else "postgresql_11"
         return Path(f"./data/db_backups/{self.database}/{db_prefix}_{size_label}.backup")
     
+    def _rewrite_query_for_encrypted_db(self, query: str) -> str:
+        """
+        Rewrite query to use decrypted views in encrypted_db.
+        Maps: users -> users_decrypted, orders -> orders_decrypted
+        """
+        if not self.is_encrypted_db:
+            return query
+        
+        import re
+        query = re.sub(r'\bFROM\s+users\b', 'FROM users_decrypted', query, flags=re.IGNORECASE)
+        query = re.sub(r'\bJOIN\s+users\b', 'JOIN users_decrypted', query, flags=re.IGNORECASE)
+        query = re.sub(r'\bINTO\s+users\b', 'INTO users_decrypted', query, flags=re.IGNORECASE)
+        query = re.sub(r'\bFROM\s+orders\b', 'FROM orders_decrypted', query, flags=re.IGNORECASE)
+        query = re.sub(r'\bJOIN\s+orders\b', 'JOIN orders_decrypted', query, flags=re.IGNORECASE)
+        query = re.sub(r'\bINTO\s+orders\b', 'INTO orders_decrypted', query, flags=re.IGNORECASE)
+        return query
+    
     # CRUD helper methods for test cases
 
     def insert_row(self, query: str, params: tuple[Any, ...] | None = None) -> None:
+        query = self._rewrite_query_for_encrypted_db(query)
         with self.client.cursor() as cursor:
             cursor.execute(query, params)
 
     def read_row(self, query: str, params: tuple[Any, ...] | None = None) -> dict[str, Any] | None:
+        query = self._rewrite_query_for_encrypted_db(query)
         extras = importlib.import_module("psycopg2.extras")
         with self.client.cursor(cursor_factory=extras.RealDictCursor) as cursor:
             cursor.execute(query, params)
@@ -120,11 +142,13 @@ class PostgresConnector(BaseConnector):
             return dict(row) if row else None
 
     def update_rows(self, query: str, params: tuple[Any, ...] | None = None) -> int:
+        query = self._rewrite_query_for_encrypted_db(query)
         with self.client.cursor() as cursor:
             cursor.execute(query, params)
             return cursor.rowcount
 
     def delete_rows(self, query: str, params: tuple[Any, ...] | None = None) -> int:
+        query = self._rewrite_query_for_encrypted_db(query)
         with self.client.cursor() as cursor:
             cursor.execute(query, params)
             return cursor.rowcount

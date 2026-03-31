@@ -190,6 +190,11 @@ def populate_database(size: int, target: str, batch_size: int, reset: bool, db: 
 	users_count = sizes["users"]
 	orders_count = sizes["orders"]
 	order_items_count = sizes["order_items"]
+	
+	# Determine table names based on database type
+	# encrypted_db uses decrypted views to insert; triggers handle encryption
+	users_table = "users_decrypted" if db == "encrypted_db" else "users"
+	orders_table = "orders_decrypted" if db == "encrypted_db" else "orders"
 
 	try:
 		with conn.cursor() as cursor:
@@ -325,18 +330,19 @@ def populate_database(size: int, target: str, batch_size: int, reset: bool, db: 
 							random.choice([1, 2]),
 						)
 					)
+				on_conflict = "" if db == "encrypted_db" else "ON CONFLICT (email) DO NOTHING"
 				execute_values(
 					cursor,
-					"""
-					INSERT INTO users (username, email, password, phone, id_role)
+					f"""
+					INSERT INTO {users_table} (username, email, password, phone, id_role)
 					VALUES %s
-					ON CONFLICT (email) DO NOTHING
+					{on_conflict}
 					""",
 					rows,
 				)
 
 			cursor.execute(
-				"SELECT id_user FROM users WHERE email LIKE %s",
+				f"SELECT id_user FROM {users_table} WHERE email LIKE %s",
 				(f"{run_tag}-u-%@bench.local",),
 			)
 			inserted_user_ids = [row[0] for row in cursor.fetchall()]
@@ -354,15 +360,15 @@ def populate_database(size: int, target: str, batch_size: int, reset: bool, db: 
 					)
 				execute_values(
 					cursor,
-					"""
-					INSERT INTO orders (id_user, id_status, total_amount, shipping_address)
+					f"""
+					INSERT INTO {orders_table} (id_user, id_status, total_amount, shipping_address)
 					VALUES %s
 					""",
 					rows,
 				)
 
 			cursor.execute(
-				"SELECT id_order FROM orders WHERE shipping_address LIKE %s",
+				f"SELECT id_order FROM {orders_table} WHERE shipping_address LIKE %s",
 				(f"{run_tag}-addr-%",),
 			)
 			inserted_order_ids = [row[0] for row in cursor.fetchall()]
@@ -402,7 +408,7 @@ def parse_args() -> argparse.Namespace:
 	parser = argparse.ArgumentParser(description="Generate random PostgreSQL data for benchmark tests")
 	parser.add_argument("--size", type=int, required=True, help="total generated row budget split across entities")
 	parser.add_argument("--target", choices=["lts", "11"], default="lts", help="postgres target instance")
-	parser.add_argument("--db", choices=["main_db", "indexed_db", "roles_db"], default="main_db", help="postgres database used for generation")
+	parser.add_argument("--db", choices=["main_db", "indexed_db", "roles_db", "encrypted_db"], default="main_db", help="postgres database used for generation")
 	parser.add_argument("--batch-size", type=int, default=1000, help="batch size for insert operations")
 	parser.add_argument("--seed", type=int, default=None, help="optional random seed")
 	parser.add_argument("--reset", action="store_true", help="truncate generated tables before inserts")
