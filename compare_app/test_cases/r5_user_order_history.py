@@ -87,7 +87,14 @@ class R5UserOrderHistoryTestCase(BaseTestCase):
                 "total_amount": 1,
                 "shipping_address": 1,
             },
-            sort=[("order_date", -1), ("id_order", -1)],
+        )
+
+        orders.sort(
+            key=lambda order: (
+                str(order.get("order_date") or ""),
+                int(order.get("id_order", 0)),
+            ),
+            reverse=True,
         )
 
         status_ids = sorted({order["id_status"] for order in orders if "id_status" in order})
