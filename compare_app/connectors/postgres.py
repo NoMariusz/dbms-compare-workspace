@@ -141,6 +141,14 @@ class PostgresConnector(BaseConnector):
             row = cursor.fetchone()
             return dict(row) if row else None
 
+    def read_rows(self, query: str, params: tuple[Any, ...] | None = None) -> list[dict[str, Any]]:
+        query = self._rewrite_query_for_encrypted_db(query)
+        extras = importlib.import_module("psycopg2.extras")
+        with self.client.cursor(cursor_factory=extras.RealDictCursor) as cursor:
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
     def update_rows(self, query: str, params: tuple[Any, ...] | None = None) -> int:
         query = self._rewrite_query_for_encrypted_db(query)
         with self.client.cursor() as cursor:
