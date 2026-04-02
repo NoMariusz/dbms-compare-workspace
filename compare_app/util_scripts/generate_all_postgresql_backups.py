@@ -61,7 +61,6 @@ def main() -> None:
                     target,
                     "--batch-size",
                     str(BATCH_SIZE),
-                    "--reset",
                     "--db",
                     db_name,
                 ]
