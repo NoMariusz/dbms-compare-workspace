@@ -1,6 +1,5 @@
 {
 	"files.exclude": {
-		"**/__pycache__/**": true,
-		"**/db_backups/**": true
+		"**/__pycache__/**": true
 	}
 }
