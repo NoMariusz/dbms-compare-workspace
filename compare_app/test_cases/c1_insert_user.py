@@ -53,3 +53,16 @@ class C1InsertUserTestCase(BaseTestCase):
             collection_name="users",
             document=self._payload(),
         )
+        
+    def prepare_for_mongodb(self, connector: MongoConnector) -> None:
+        connector.delete_many(
+            collection_name="users",
+            filter_query={"id_user": self._payload()["id_user"]},
+        )
+
+
+    def prepare_for_couchdb(self, connector: CouchConnector) -> None:
+        connector.delete_many(
+            collection_name="users",
+            filter_query={"id_user": self._payload()["id_user"]},
+        )

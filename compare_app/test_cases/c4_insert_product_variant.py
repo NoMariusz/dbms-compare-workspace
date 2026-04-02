@@ -44,8 +44,61 @@ class C4InsertProductVariantTestCase(BaseTestCase):
             ),
         )
 
+    def prepare_for_mongodb(self, connector: MongoConnector) -> None:
+        connector.delete_many(
+            collection_name="product",
+            filter_query={"description": self._variant_payload()["description"]},
+        )
+
+
+    def prepare_for_couchdb(self, connector: CouchConnector) -> None:
+        connector.delete_many(
+            collection_name="product",
+            filter_query={"description": self._variant_payload()["description"]},
+        )
+
+
     def run_for_mongodb(self, connector: MongoConnector) -> None:
-        pass
+        base_product = connector.read_latest("product")
+        if base_product is None:
+            raise RuntimeError("No product found for C4InsertProductVariantTestCase")
+
+        variant = self._variant_payload()
+        product_id = connector.get_next_business_id("product")
+
+        connector.insert_one(
+            collection_name="product",
+            document={
+                "id_product": product_id,
+                "id_model": base_product["id_model"],
+                "id_specification": base_product["id_specification"],
+                "color_name": variant["color_name"],
+                "size_value": variant["size_value"],
+                "stock_quantity": variant["stock_quantity"],
+                "price": variant["price"],
+                "description": variant["description"],
+            },
+        )
+
 
     def run_for_couchdb(self, connector: CouchConnector) -> None:
-        pass
+        base_product = connector.read_latest("product")
+        if base_product is None:
+            raise RuntimeError("No product found for C4InsertProductVariantTestCase")
+
+        variant = self._variant_payload()
+        product_id = connector.get_next_business_id("product")
+
+        connector.insert_one(
+            collection_name="product",
+            document={
+                "id_product": product_id,
+                "id_model": base_product["id_model"],
+                "id_specification": base_product["id_specification"],
+                "color_name": variant["color_name"],
+                "size_value": variant["size_value"],
+                "stock_quantity": variant["stock_quantity"],
+                "price": variant["price"],
+                "description": variant["description"],
+            },
+        )

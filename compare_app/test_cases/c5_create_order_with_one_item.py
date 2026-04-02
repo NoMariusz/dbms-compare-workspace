@@ -4,6 +4,7 @@ from connectors.couchdb import CouchConnector
 from connectors.mongodb import MongoConnector
 from connectors.postgres import PostgresConnector
 from test_cases.base import BaseTestCase
+import datetime
 
 
 class C5CreateOrderWithOneItemTestCase(BaseTestCase):
@@ -44,8 +45,115 @@ class C5CreateOrderWithOneItemTestCase(BaseTestCase):
             ),
         )
 
+    def prepare_for_mongodb(self, connector: MongoConnector) -> None:
+        benchmark_orders = connector.read_many(
+            collection_name="orders",
+            filter_query={"shipping_address": self._payload()["shipping_address"]},
+            projection={"id_order": 1, "_id": 0},
+        )
+        order_ids = [order["id_order"] for order in benchmark_orders if "id_order" in order]
+        if order_ids:
+            connector.delete_many(
+                collection_name="order_items",
+                filter_query={"id_order": {"$in": order_ids}},
+            )
+            connector.delete_many(
+                collection_name="orders",
+                filter_query={"id_order": {"$in": order_ids}},
+            )
+
+
+    def prepare_for_couchdb(self, connector: CouchConnector) -> None:
+        benchmark_orders = connector.read_many(
+            collection_name="orders",
+            filter_query={"shipping_address": self._payload()["shipping_address"]},
+            projection={"id_order": 1, "_id": 0},
+        )
+        order_ids = [order["id_order"] for order in benchmark_orders if "id_order" in order]
+        if order_ids:
+            connector.delete_many(
+                collection_name="order_items",
+                filter_query={"id_order": {"$in": order_ids}},
+            )
+            connector.delete_many(
+                collection_name="orders",
+                filter_query={"id_order": {"$in": order_ids}},
+            )
+
+
     def run_for_mongodb(self, connector: MongoConnector) -> None:
-        pass
+        payload = self._payload()
+
+        selected_user = connector.read_latest("users")
+        selected_product = connector.read_latest("product")
+
+        if selected_user is None:
+            raise RuntimeError("No user found for C5CreateOrderWithOneItemTestCase")
+        if selected_product is None:
+            raise RuntimeError("No product found for C5CreateOrderWithOneItemTestCase")
+
+        order_id = connector.get_next_business_id("orders")
+        order_item_id = connector.get_next_business_id("order_items")
+        total_amount = float(selected_product["price"]) * int(payload["quantity"])
+
+        connector.insert_one(
+            collection_name="orders",
+            document={
+                "id_order": order_id,
+                "id_user": selected_user["id_user"],
+                "id_status": payload["id_status"],
+                "total_amount": total_amount,
+                "shipping_address": payload["shipping_address"],
+                "order_date": datetime.datetime.now(datetime.UTC).isoformat(),
+            },
+        )
+
+        connector.insert_one(
+            collection_name="order_items",
+            document={
+                "id_order_item": order_item_id,
+                "id_order": order_id,
+                "id_product": selected_product["id_product"],
+                "quantity": payload["quantity"],
+                "unit_price": selected_product["price"],
+            },
+        )
+
 
     def run_for_couchdb(self, connector: CouchConnector) -> None:
-        pass
+        payload = self._payload()
+
+        selected_user = connector.read_latest("users")
+        selected_product = connector.read_latest("product")
+
+        if selected_user is None:
+            raise RuntimeError("No user found for C5CreateOrderWithOneItemTestCase")
+        if selected_product is None:
+            raise RuntimeError("No product found for C5CreateOrderWithOneItemTestCase")
+
+        order_id = connector.get_next_business_id("orders")
+        order_item_id = connector.get_next_business_id("order_items")
+        total_amount = float(selected_product["price"]) * int(payload["quantity"])
+
+        connector.insert_one(
+            collection_name="orders",
+            document={
+                "id_order": order_id,
+                "id_user": selected_user["id_user"],
+                "id_status": payload["id_status"],
+                "total_amount": total_amount,
+                "shipping_address": payload["shipping_address"],
+                "order_date": datetime.datetime.now(datetime.UTC).isoformat(),
+            },
+        )
+
+        connector.insert_one(
+            collection_name="order_items",
+            document={
+                "id_order_item": order_item_id,
+                "id_order": order_id,
+                "id_product": selected_product["id_product"],
+                "quantity": payload["quantity"],
+                "unit_price": selected_product["price"],
+            },
+        )

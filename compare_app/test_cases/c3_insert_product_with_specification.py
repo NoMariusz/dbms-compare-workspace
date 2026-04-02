@@ -62,8 +62,99 @@ class C3InsertProductWithSpecificationTestCase(BaseTestCase):
             ),
         )
 
+    def prepare_for_mongodb(self, connector: MongoConnector) -> None:
+        connector.delete_many(
+            collection_name="product",
+            filter_query={"description": self._product_payload()["description"]},
+        )
+        connector.delete_many(
+            collection_name="gear_specifications",
+            filter_query={"bearing_type": self._spec_payload()["bearing_type"]},
+        )
+
+
+    def prepare_for_couchdb(self, connector: CouchConnector) -> None:
+        connector.delete_many(
+            collection_name="product",
+            filter_query={"description": self._product_payload()["description"]},
+        )
+        connector.delete_many(
+            collection_name="gear_specifications",
+            filter_query={"bearing_type": self._spec_payload()["bearing_type"]},
+        )
+
+
     def run_for_mongodb(self, connector: MongoConnector) -> None:
-        pass
+        selected_model = connector.read_latest("models")
+        if selected_model is None:
+            raise RuntimeError("No model found for C3InsertProductWithSpecificationTestCase")
+
+        spec = self._spec_payload()
+        product = self._product_payload()
+
+        specification_id = connector.get_next_business_id("gear_specifications")
+        product_id = connector.get_next_business_id("product")
+
+        connector.insert_one(
+            collection_name="gear_specifications",
+            document={
+                "id_specification": specification_id,
+                "wheel_size": spec["wheel_size"],
+                "number_of_wheels": spec["number_of_wheels"],
+                "blade_material": spec["blade_material"],
+                "boot_material": spec["boot_material"],
+                "bearing_type": spec["bearing_type"],
+            },
+        )
+
+        connector.insert_one(
+            collection_name="product",
+            document={
+                "id_product": product_id,
+                "id_model": selected_model["id_model"],
+                "id_specification": specification_id,
+                "color_name": product["color_name"],
+                "size_value": product["size_value"],
+                "stock_quantity": product["stock_quantity"],
+                "price": product["price"],
+                "description": product["description"],
+            },
+        )
+
 
     def run_for_couchdb(self, connector: CouchConnector) -> None:
-        pass
+        selected_model = connector.read_latest("models")
+        if selected_model is None:
+            raise RuntimeError("No model found for C3InsertProductWithSpecificationTestCase")
+
+        spec = self._spec_payload()
+        product = self._product_payload()
+
+        specification_id = connector.get_next_business_id("gear_specifications")
+        product_id = connector.get_next_business_id("product")
+
+        connector.insert_one(
+            collection_name="gear_specifications",
+            document={
+                "id_specification": specification_id,
+                "wheel_size": spec["wheel_size"],
+                "number_of_wheels": spec["number_of_wheels"],
+                "blade_material": spec["blade_material"],
+                "boot_material": spec["boot_material"],
+                "bearing_type": spec["bearing_type"],
+            },
+        )
+
+        connector.insert_one(
+            collection_name="product",
+            document={
+                "id_product": product_id,
+                "id_model": selected_model["id_model"],
+                "id_specification": specification_id,
+                "color_name": product["color_name"],
+                "size_value": product["size_value"],
+                "stock_quantity": product["stock_quantity"],
+                "price": product["price"],
+                "description": product["description"],
+            },
+        )

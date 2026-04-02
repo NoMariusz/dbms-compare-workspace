@@ -41,8 +41,76 @@ class C2InsertManufacturerModelTestCase(BaseTestCase):
             ),
         )
 
+    def prepare_for_mongodb(self, connector: MongoConnector) -> None:
+        connector.delete_many(
+            collection_name="models",
+            filter_query={"model_name": self._model_payload()["model_name"]},
+        )
+        connector.delete_many(
+            collection_name="manufacturers",
+            filter_query={"name": self._manufacturer_name()},
+        )
+
+
+    def prepare_for_couchdb(self, connector: CouchConnector) -> None:
+        connector.delete_many(
+            collection_name="models",
+            filter_query={"model_name": self._model_payload()["model_name"]},
+        )
+        connector.delete_many(
+            collection_name="manufacturers",
+            filter_query={"name": self._manufacturer_name()},
+        )
+
+
     def run_for_mongodb(self, connector: MongoConnector) -> None:
-        pass
+        manufacturer_id = connector.get_next_business_id("manufacturers")
+        model_id = connector.get_next_business_id("models")
+
+        connector.insert_one(
+            collection_name="manufacturers",
+            document={
+                "id_manufacturer": manufacturer_id,
+                "name": self._manufacturer_name(),
+            },
+        )
+
+        model_payload = self._model_payload()
+        model_payload.pop("type", None)
+
+        connector.insert_one(
+            collection_name="models",
+            document={
+                "id_model": model_id,
+                "id_manufacturer": manufacturer_id,
+                "model_name": model_payload["model_name"],
+                "description": model_payload["description"],
+                "release_date": model_payload["release_date"],
+            },
+        )
+
 
     def run_for_couchdb(self, connector: CouchConnector) -> None:
-        pass
+        manufacturer_id = connector.get_next_business_id("manufacturers")
+        model_id = connector.get_next_business_id("models")
+
+        connector.insert_one(
+            collection_name="manufacturers",
+            document={
+                "id_manufacturer": manufacturer_id,
+                "name": self._manufacturer_name(),
+            },
+        )
+
+        model_payload = self._model_payload()
+
+        connector.insert_one(
+            collection_name="models",
+            document={
+                "id_model": model_id,
+                "id_manufacturer": manufacturer_id,
+                "model_name": model_payload["model_name"],
+                "description": model_payload["description"],
+                "release_date": model_payload["release_date"],
+            },
+        )
