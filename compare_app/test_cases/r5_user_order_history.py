@@ -29,7 +29,82 @@ class R5UserOrderHistoryTestCase(BaseTestCase):
         )
 
     def run_for_mongodb(self, connector: MongoConnector) -> None:
-        pass
+        user = connector.read_one(
+            collection_name="users",
+            filter_query={"email": "benchmark_user@example.com"},
+            projection={"_id": 0, "id_user": 1},
+        )
+        if user is None:
+            return
+
+        orders = connector.read_many(
+            collection_name="orders",
+            filter_query={"id_user": user["id_user"]},
+            projection={
+                "_id": 0,
+                "id_order": 1,
+                "id_user": 1,
+                "id_status": 1,
+                "order_date": 1,
+                "total_amount": 1,
+                "shipping_address": 1,
+            },
+            sort=[("order_date", -1), ("id_order", -1)],
+        )
+
+        status_ids = sorted({order["id_status"] for order in orders if "id_status" in order})
+        statuses = connector.read_many(
+            collection_name="order_status",
+            filter_query={"id_status": {"$in": status_ids}},
+            projection={"_id": 0, "id_status": 1, "status_name": 1},
+        )
+        statuses_by_id = {status["id_status"]: status["status_name"] for status in statuses}
+
+        _ = [
+            {
+                **order,
+                "status_name": statuses_by_id.get(order["id_status"]),
+            }
+            for order in orders
+        ]
+
 
     def run_for_couchdb(self, connector: CouchConnector) -> None:
-        pass
+        user = connector.read_one(
+            collection_name="users",
+            filter_query={"email": "benchmark_user@example.com"},
+            projection={"_id": 0, "id_user": 1},
+        )
+        if user is None:
+            return
+
+        orders = connector.read_many(
+            collection_name="orders",
+            filter_query={"id_user": user["id_user"]},
+            projection={
+                "_id": 0,
+                "id_order": 1,
+                "id_user": 1,
+                "id_status": 1,
+                "order_date": 1,
+                "total_amount": 1,
+                "shipping_address": 1,
+            },
+            sort=[("order_date", -1), ("id_order", -1)],
+        )
+
+        status_ids = sorted({order["id_status"] for order in orders if "id_status" in order})
+        statuses = connector.read_many(
+            collection_name="order_status",
+            filter_query={"id_status": {"$in": status_ids}},
+            projection={"_id": 0, "id_status": 1, "status_name": 1},
+        )
+        statuses_by_id = {status["id_status"]: status["status_name"] for status in statuses}
+
+        _ = [
+            {
+                **order,
+                "status_name": statuses_by_id.get(order["id_status"]),
+            }
+            for order in orders
+        ]

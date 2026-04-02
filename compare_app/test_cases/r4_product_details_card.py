@@ -40,7 +40,136 @@ class R4ProductDetailsCardTestCase(BaseTestCase):
         )
 
     def run_for_mongodb(self, connector: MongoConnector) -> None:
-        pass
+        selected_product = connector.read_latest("product")
+        if selected_product is None:
+            return
+
+        model = connector.read_one(
+            collection_name="models",
+            filter_query={"id_model": selected_product["id_model"]},
+            projection={
+                "_id": 0,
+                "id_model": 1,
+                "id_manufacturer": 1,
+                "model_name": 1,
+                "release_date": 1,
+            },
+        )
+        if model is None:
+            return
+
+        manufacturer = connector.read_one(
+            collection_name="manufacturers",
+            filter_query={"id_manufacturer": model["id_manufacturer"]},
+            projection={"_id": 0, "id_manufacturer": 1, "name": 1},
+        )
+        specification = connector.read_one(
+            collection_name="gear_specifications",
+            filter_query={"id_specification": selected_product["id_specification"]},
+            projection={
+                "_id": 0,
+                "wheel_size": 1,
+                "number_of_wheels": 1,
+                "blade_material": 1,
+                "boot_material": 1,
+                "bearing_type": 1,
+            },
+        )
+
+        variants = connector.read_many(
+            collection_name="product",
+            filter_query={"id_model": selected_product["id_model"]},
+            projection={
+                "_id": 0,
+                "id_product": 1,
+                "color_name": 1,
+                "size_value": 1,
+                "stock_quantity": 1,
+                "price": 1,
+            },
+            sort=[("id_product", 1)],
+        )
+
+        _ = {
+            "product": {
+                **selected_product,
+                "model_name": model.get("model_name"),
+                "release_date": model.get("release_date"),
+                "id_manufacturer": model.get("id_manufacturer"),
+                "manufacturer_name": manufacturer.get("name") if manufacturer else None,
+                "wheel_size": specification.get("wheel_size") if specification else None,
+                "number_of_wheels": specification.get("number_of_wheels") if specification else None,
+                "blade_material": specification.get("blade_material") if specification else None,
+                "boot_material": specification.get("boot_material") if specification else None,
+                "bearing_type": specification.get("bearing_type") if specification else None,
+            },
+            "variants": variants,
+        }
+
 
     def run_for_couchdb(self, connector: CouchConnector) -> None:
-        pass
+        selected_product = connector.read_latest("product")
+        if selected_product is None:
+            return
+
+        model = connector.read_one(
+            collection_name="models",
+            filter_query={"id_model": selected_product["id_model"]},
+            projection={
+                "_id": 0,
+                "id_model": 1,
+                "id_manufacturer": 1,
+                "model_name": 1,
+                "release_date": 1,
+            },
+        )
+        if model is None:
+            return
+
+        manufacturer = connector.read_one(
+            collection_name="manufacturers",
+            filter_query={"id_manufacturer": model["id_manufacturer"]},
+            projection={"_id": 0, "id_manufacturer": 1, "name": 1},
+        )
+        specification = connector.read_one(
+            collection_name="gear_specifications",
+            filter_query={"id_specification": selected_product["id_specification"]},
+            projection={
+                "_id": 0,
+                "wheel_size": 1,
+                "number_of_wheels": 1,
+                "blade_material": 1,
+                "boot_material": 1,
+                "bearing_type": 1,
+            },
+        )
+
+        variants = connector.read_many(
+            collection_name="product",
+            filter_query={"id_model": selected_product["id_model"]},
+            projection={
+                "_id": 0,
+                "id_product": 1,
+                "color_name": 1,
+                "size_value": 1,
+                "stock_quantity": 1,
+                "price": 1,
+            },
+            sort=[("id_product", 1)],
+        )
+
+        _ = {
+            "product": {
+                **selected_product,
+                "model_name": model.get("model_name"),
+                "release_date": model.get("release_date"),
+                "id_manufacturer": model.get("id_manufacturer"),
+                "manufacturer_name": manufacturer.get("name") if manufacturer else None,
+                "wheel_size": specification.get("wheel_size") if specification else None,
+                "number_of_wheels": specification.get("number_of_wheels") if specification else None,
+                "blade_material": specification.get("blade_material") if specification else None,
+                "boot_material": specification.get("boot_material") if specification else None,
+                "bearing_type": specification.get("bearing_type") if specification else None,
+            },
+            "variants": variants,
+        }

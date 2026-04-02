@@ -29,7 +29,72 @@ class R2ListProductsByTypeTestCase(BaseTestCase):
         )
 
     def run_for_mongodb(self, connector: MongoConnector) -> None:
-        pass
+        product_type = connector.read_one(
+            collection_name="product_types",
+            filter_query={"type_name": "In-line Skates"},
+            projection={"_id": 0, "id_type": 1, "type_name": 1},
+        )
+        if product_type is None:
+            return
+
+        mappings = connector.read_many(
+            collection_name="models_to_product_types",
+            filter_query={"id_type": product_type["id_type"]},
+            projection={"_id": 0, "id_model": 1},
+        )
+        model_ids = [mapping["id_model"] for mapping in mappings if "id_model" in mapping]
+        if not model_ids:
+            return
+
+        connector.read_many(
+            collection_name="product",
+            filter_query={"id_model": {"$in": model_ids}},
+            projection={
+                "_id": 0,
+                "id_product": 1,
+                "id_model": 1,
+                "id_specification": 1,
+                "color_name": 1,
+                "size_value": 1,
+                "stock_quantity": 1,
+                "price": 1,
+                "description": 1,
+            },
+            sort=[("id_product", 1)],
+        )
+
 
     def run_for_couchdb(self, connector: CouchConnector) -> None:
-        pass
+        product_type = connector.read_one(
+            collection_name="product_types",
+            filter_query={"type_name": "In-line Skates"},
+            projection={"_id": 0, "id_type": 1, "type_name": 1},
+        )
+        if product_type is None:
+            return
+
+        mappings = connector.read_many(
+            collection_name="models_to_product_types",
+            filter_query={"id_type": product_type["id_type"]},
+            projection={"_id": 0, "id_model": 1},
+        )
+        model_ids = [mapping["id_model"] for mapping in mappings if "id_model" in mapping]
+        if not model_ids:
+            return
+
+        connector.read_many(
+            collection_name="product",
+            filter_query={"id_model": {"$in": model_ids}},
+            projection={
+                "_id": 0,
+                "id_product": 1,
+                "id_model": 1,
+                "id_specification": 1,
+                "color_name": 1,
+                "size_value": 1,
+                "stock_quantity": 1,
+                "price": 1,
+                "description": 1,
+            },
+            sort=[("id_product", 1)],
+        )
