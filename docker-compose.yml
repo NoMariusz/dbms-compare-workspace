@@ -24,7 +24,7 @@ services:
         build: ./couchdb
         container_name: couchdb_lts
         environment:
-            COUCHDB_USERNAME: admin
+            COUCHDB_USER: admin
             COUCHDB_PASSWORD: password123
         ports:
             - '5984:5984'
