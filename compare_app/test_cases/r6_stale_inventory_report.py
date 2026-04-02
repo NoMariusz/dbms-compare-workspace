@@ -138,18 +138,28 @@ class R6StaleInventoryReportTestCase(BaseTestCase):
         if not products:
             return
 
-        product_ids = [product["id_product"] for product in products if "id_product" in product]
-        if not product_ids:
+        products_by_id = {
+            product["id_product"]: product
+            for product in products
+            if "id_product" in product
+        }
+        if not products_by_id:
             return
 
         order_items = connector.read_many(
             collection_name="order_items",
-            filter_query={"id_product": {"$in": product_ids}},
+            filter_query={},
             projection={"_id": 0, "id_product": 1, "id_order": 1},
         )
 
+        relevant_order_items = [
+            order_item
+            for order_item in order_items
+            if order_item.get("id_product") in products_by_id
+        ]
+
         order_ids = sorted(
-            {order_item["id_order"] for order_item in order_items if "id_order" in order_item}
+            {order_item["id_order"] for order_item in relevant_order_items if "id_order" in order_item}
         )
 
         orders_by_id = {}
@@ -166,7 +176,7 @@ class R6StaleInventoryReportTestCase(BaseTestCase):
             }
 
         last_purchase_by_product = {}
-        for order_item in order_items:
+        for order_item in relevant_order_items:
             product_id = order_item.get("id_product")
             order_id = order_item.get("id_order")
             if product_id is None or order_id is None:
@@ -181,7 +191,7 @@ class R6StaleInventoryReportTestCase(BaseTestCase):
                 last_purchase_by_product[product_id] = order_date
 
         report_rows = []
-        for product in products:
+        for product_id, product in products_by_id.items():
             report_rows.append(
                 {
                     "id_product": product["id_product"],
@@ -190,7 +200,7 @@ class R6StaleInventoryReportTestCase(BaseTestCase):
                     "size_value": product["size_value"],
                     "stock_quantity": product["stock_quantity"],
                     "price": product["price"],
-                    "last_purchase_at": last_purchase_by_product.get(product["id_product"]),
+                    "last_purchase_at": last_purchase_by_product.get(product_id),
                 }
             )
 

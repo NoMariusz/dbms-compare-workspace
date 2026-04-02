@@ -155,8 +155,8 @@ class R4ProductDetailsCardTestCase(BaseTestCase):
                 "stock_quantity": 1,
                 "price": 1,
             },
-            sort=[("id_product", 1)],
         )
+        variants.sort(key=lambda variant: int(variant["id_product"]))
 
         _ = {
             "product": {

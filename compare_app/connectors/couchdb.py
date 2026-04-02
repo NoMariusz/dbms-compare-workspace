@@ -31,7 +31,9 @@ class CouchConnector(BaseConnector):
         ("users", "email"): "idx_users_email",
         ("users", "id_user"): "idx_users_id_user",
         ("manufacturers", "id_manufacturer"): "idx_manufacturers_id_manufacturer",
+        ("manufacturers", "name"): "idx_manufacturers_name",
         ("models", "id_model"): "idx_models_id_model",
+        ("models", "id_manufacturer"): "idx_models_id_manufacturer",
         ("gear_specifications", "id_specification"): "idx_gear_specifications_id_specification",
         ("product", "id_product"): "idx_product_id_product",
         ("product", "id_model"): "idx_product_model",
@@ -40,8 +42,11 @@ class CouchConnector(BaseConnector):
         ("order_items", "id_order_item"): "idx_order_items_id_order_item",
         ("order_items", "id_order"): "idx_order_items_order",
         ("models", "model_name"): "idx_models_model_name",
+        ("models_to_product_types", "id_type"): "idx_models_to_product_types_id_type",
         ("product", "stock_quantity"): "idx_product_stock_quantity",
+        ("product_types", "type_name"): "idx_product_types_type_name",
         ("order_items", "id_product"): "idx_order_items_product",
+        ("order_status", "id_status"): "idx_order_status_id_status",
     }
 
     def __init__(self, host: str, port: int, user: str, password: str) -> None:
@@ -66,9 +71,14 @@ class CouchConnector(BaseConnector):
         
     def _ensure_runtime_indexes(self) -> None:
         runtime_indexes = [
+            ("idx_product_types_type_name", ["type", "type_name"]),
+            ("idx_models_to_product_types_id_type", ["type", "id_type"]),
+            ("idx_manufacturers_name", ["type", "name"]),
+            ("idx_models_id_manufacturer", ["type", "id_manufacturer"]),
             ("idx_models_model_name", ["type", "model_name"]),
             ("idx_product_stock_quantity", ["type", "stock_quantity"]),
             ("idx_order_items_product", ["type", "id_product"]),
+            ("idx_order_status_id_status", ["type", "id_status"]),
         ]
 
         for name, fields in runtime_indexes:

@@ -108,10 +108,9 @@ class R3SearchProductsByManufacturerTestCase(BaseTestCase):
                 "stock_quantity": 1,
                 "price": 1,
             },
-            sort=[("id_product", 1)],
         )
 
-        _ = [
+        result = [
             {
                 "id_product": product["id_product"],
                 "color_name": product["color_name"],
@@ -126,3 +125,6 @@ class R3SearchProductsByManufacturerTestCase(BaseTestCase):
             for product in products
             if product["id_model"] in models_by_id
         ]
+
+        result.sort(key=lambda product: int(product["id_product"]))
+        _ = result

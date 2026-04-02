@@ -78,7 +78,7 @@ class R2ListProductsByTypeTestCase(BaseTestCase):
         if not model_ids:
             return
 
-        connector.read_many(
+        products = connector.read_many(
             collection_name="product",
             filter_query={"id_model": {"$in": model_ids}},
             projection={
@@ -92,5 +92,7 @@ class R2ListProductsByTypeTestCase(BaseTestCase):
                 "price": 1,
                 "description": 1,
             },
-            sort=[("id_product", 1)],
         )
+
+        products.sort(key=lambda product: int(product["id_product"]))
+        _ = products
