@@ -13,30 +13,32 @@ This project orchestrates a multi-database environment using Docker Compose. It 
 
 1. Clone this repository or copy the files into a project folder.
 2. Run the following command to build and start the containers:
-    ```bash
-    docker-compose up -d
-    ```
+   ```bash
+   docker-compose up -d
+   ```
 3. Create venv for ./compare_app
 4. Install pip packages from requirements.txt file
 5. Fill .env file, example content:
-    ```
-    # PostgreSQL lts connection configuration
-    POSTGRES_LTS_USER=admin
-    POSTGRES_LTS_PASSWORD=password123
-    POSTGRES_LTS_PORT=15432
-    # PostgreSQLv11 connection configuration
-    POSTGRES_11_USER=admin
-    POSTGRES_11_PASSWORD=password123
-    POSTGRES_11_PORT=15433
-    # MongoDB connection configuration
-    MONGO_USERNAME=admin
-    MONGO_PASSWORD=password123
-    MONGO_PORT=27017
-    # CouchDB connection configuration
-    COUCHDB_USERNAME=admin
-    COUCHDB_PASSWORD=password123
-    COUCHDB_PORT=5984
-    ```
+   ```
+   # PostgreSQL lts connection configuration
+   POSTGRES_LTS_USER=admin
+   POSTGRES_LTS_PASSWORD=password123
+   POSTGRES_LTS_PORT=15432
+   # PostgreSQLv11 connection configuration
+   POSTGRES_11_USER=admin
+   POSTGRES_11_PASSWORD=password123
+   POSTGRES_11_PORT=15433
+   # MongoDB connection configuration
+   MONGO_HOST=localhost
+   MONGO_PORT=27017
+   MONGO_USERNAME=admin
+   MONGO_PASSWORD=password123
+   # CouchDB connection configuration
+   COUCHDB_HOST=localhost
+   COUCHDB_USER=admin
+   COUCHDB_PASSWORD=password123
+   COUCHDB_PORT=5984
+   ```
 6. Download or generate new db_backups using for example compare_app\util_scripts\generate_all_postgresql_backups.py
 7. You can run tests and produre results CSV file by using main.py file
 
@@ -145,49 +147,49 @@ compare_app/
 ### How to run compare_app
 
 1. Start containers:
-    ```bash
-    docker-compose up -d
-    ```
+   ```bash
+   docker-compose up -d
+   ```
 2. Install Python dependencies:
-    ```bash
-    pip install -r compare_app/requirements.txt
-    ```
+   ```bash
+   pip install -r compare_app/requirements.txt
+   ```
 3. Run the benchmark app:
-    ```bash
-    cd compare_app
-    python main.py
-    ```
+   ```bash
+   cd compare_app
+   python main.py
+   ```
 4. Check CSV output at the path from `config.OUTPUT_FILE_PATH` (default `./data/base_results.csv`).
 
 ### Configuration points
 
 - `compare_app/config.py`
-    - `TESTED_DBMS`: chooses which connectors are instantiated
-    - `TESTED_SIZES`: chooses benchmark size levels
-    - `OUTPUT_FILE_PATH`: output CSV location
+  - `TESTED_DBMS`: chooses which connectors are instantiated
+  - `TESTED_SIZES`: chooses benchmark size levels
+  - `OUTPUT_FILE_PATH`: output CSV location
 - `compare_app/.env`
-    - DB connection credentials and ports
-    - optional host overrides (defaults to `localhost` in `main.py`)
+  - DB connection credentials and ports
+  - optional host overrides (defaults to `localhost` in `main.py`)
 
 ### How to add a new test case
 
 1. Create a new file in `compare_app/test_cases/` (for example `u1_update_user.py`).
 2. Inherit from `BaseTestCase` and set a unique `name`.
 3. Implement:
-    - `run_for_postgresql`
-    - `run_for_mongodb`
-    - `run_for_couchdb`
+   - `run_for_postgresql`
+   - `run_for_mongodb`
+   - `run_for_couchdb`
 4. If a branch is not ready yet, raise `NotImplementedError` explicitly.
 5. Register the class in `build_test_cases()` in `compare_app/main.py`.
 
 ### How to extend connector capabilities
 
 - PostgreSQL:
-    - Add methods in `compare_app/connectors/postgres.py` that accept SQL query + params.
-    - Keep query semantics in test cases, connector methods focused on execution.
+  - Add methods in `compare_app/connectors/postgres.py` that accept SQL query + params.
+  - Keep query semantics in test cases, connector methods focused on execution.
 - MongoDB / CouchDB:
-    - Add DB-specific helper methods directly in each connector when needed by tests.
-    - Then replace `NotImplementedError` branches in test cases with concrete calls.
+  - Add DB-specific helper methods directly in each connector when needed by tests.
+  - Then replace `NotImplementedError` branches in test cases with concrete calls.
 
 ### How to scale toward more scenarios
 
