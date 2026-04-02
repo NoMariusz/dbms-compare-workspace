@@ -11,19 +11,15 @@ class R2ListProductsByTypeTestCase(BaseTestCase):
         super().__init__(name="r2_list_products_by_type")
 
     def run_for_postgresql(self, connector: PostgresConnector) -> None:
-        connector.read_row(
+        connector.read_rows(
             query=(
-                "SELECT COALESCE(json_agg(products), '[]'::json) AS products "
-                "FROM ("
                 "SELECT "
                 "p.id_product, p.id_model, p.id_specification, p.color_name, p.size_value, "
-                "p.stock_quantity, p.price, p.description, pt.type_name "
+                "p.stock_quantity, p.price, p.description "
                 "FROM product p "
                 "JOIN models_to_product_types mpt ON mpt.id_model = p.id_model "
                 "JOIN product_types pt ON pt.id_type = mpt.id_type "
-                "WHERE pt.type_name = %s "
-                "ORDER BY p.id_product"
-                ") AS products"
+                "WHERE pt.type_name = %s"
             ),
             params=("In-line Skates",),
         )

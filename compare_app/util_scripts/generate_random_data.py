@@ -411,15 +411,14 @@ def parse_args() -> argparse.Namespace:
 	parser.add_argument("--db", choices=["main_db", "indexed_db", "roles_db", "encrypted_db"], default="main_db", help="postgres database used for generation")
 	parser.add_argument("--batch-size", type=int, default=1000, help="batch size for insert operations")
 	parser.add_argument("--seed", type=int, default=None, help="optional random seed")
-	parser.add_argument("--reset", action="store_true", help="truncate generated tables before inserts")
 	return parser.parse_args()
 
-# Populate db: py util_scripts\generate_random_data.py --size 500000 --target lts --batch-size 5000 --reset --db main_db
+# Populate db: py util_scripts\generate_random_data.py --size 500000 --target lts --batch-size 5000 --db main_db
 # Rr other possibilities:
-# py util_scripts\generate_random_data.py --size 500000 --target lts --batch-size 5000 --reset --db indexed_db
-# py util_scripts\generate_random_data.py --size 500000 --target 11 --batch-size 5000 --reset --db main_db
-# py util_scripts\generate_random_data.py --size 500000 --target 11 --batch-size 5000 --reset --db indexed_db
-# py util_scripts\generate_random_data.py --size 1000000 --target lts --batch-size 5000 --reset --db main_db
+# py util_scripts\generate_random_data.py --size 500000 --target lts --batch-size 5000 --db indexed_db
+# py util_scripts\generate_random_data.py --size 500000 --target 11 --batch-size 5000 --db main_db
+# py util_scripts\generate_random_data.py --size 500000 --target 11 --batch-size 5000 --db indexed_db
+# py util_scripts\generate_random_data.py --size 1000000 --target lts --batch-size 5000 --db main_db
 # ...
 """
 Create backup:
@@ -454,7 +453,7 @@ def main() -> None:
 		size=args.size,
 		target=args.target,
 		batch_size=args.batch_size,
-		reset=args.reset,
+		reset=True,
 		db=args.db,
 	)
 	print(f"Data generation finished for target={args.target}, size={args.size}")

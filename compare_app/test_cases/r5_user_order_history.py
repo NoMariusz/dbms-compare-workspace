@@ -11,10 +11,8 @@ class R5UserOrderHistoryTestCase(BaseTestCase):
         super().__init__(name="r5_user_order_history")
 
     def run_for_postgresql(self, connector: PostgresConnector) -> None:
-        connector.read_row(
+        connector.read_rows(
             query=(
-                "SELECT COALESCE(json_agg(user_orders), '[]'::json) AS orders "
-                "FROM ("
                 "SELECT "
                 "o.id_order, o.id_user, o.id_status, os.status_name, "
                 "o.order_date, o.total_amount, o.shipping_address "
@@ -23,7 +21,6 @@ class R5UserOrderHistoryTestCase(BaseTestCase):
                 "JOIN order_status os ON os.id_status = o.id_status "
                 "WHERE u.email = %s "
                 "ORDER BY o.order_date DESC, o.id_order DESC"
-                ") AS user_orders"
             ),
             params=("benchmark_user@example.com",),
         )

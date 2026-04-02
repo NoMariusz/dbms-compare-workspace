@@ -21,10 +21,8 @@ class R6StaleInventoryReportTestCase(BaseTestCase):
         super().__init__(name="r6_stale_inventory_report")
 
     def run_for_postgresql(self, connector: PostgresConnector) -> None:
-        connector.read_row(
+        connector.read_rows(
             query=(
-                "SELECT COALESCE(json_agg(report_rows), '[]'::json) AS stale_inventory "
-                "FROM ("
                 "SELECT "
                 "p.id_product, p.id_model, p.color_name, p.size_value, p.stock_quantity, p.price, "
                 "MAX(o.order_date) AS last_purchase_at "
@@ -35,7 +33,6 @@ class R6StaleInventoryReportTestCase(BaseTestCase):
                 "GROUP BY p.id_product, p.id_model, p.color_name, p.size_value, p.stock_quantity, p.price "
                 "ORDER BY last_purchase_at ASC NULLS FIRST, p.stock_quantity DESC, p.id_product "
                 "LIMIT %s"
-                ") AS report_rows"
             ),
             params=(10,),
         )

@@ -11,19 +11,15 @@ class R3SearchProductsByManufacturerTestCase(BaseTestCase):
         super().__init__(name="r3_search_products_by_manufacturer")
 
     def run_for_postgresql(self, connector: PostgresConnector) -> None:
-        connector.read_row(
+        connector.read_rows(
             query=(
-                "SELECT COALESCE(json_agg(products), '[]'::json) AS products "
-                "FROM ("
                 "SELECT "
                 "p.id_product, p.color_name, p.size_value, p.stock_quantity, p.price, "
                 "m.id_model, m.model_name, mf.id_manufacturer, mf.name AS manufacturer_name "
                 "FROM product p "
                 "JOIN models m ON m.id_model = p.id_model "
                 "JOIN manufacturers mf ON mf.id_manufacturer = m.id_manufacturer "
-                "WHERE mf.name = %s "
-                "ORDER BY p.id_product"
-                ") AS products"
+                "WHERE mf.name = %s"
             ),
             params=("benchmark_manufacturer",),
         )

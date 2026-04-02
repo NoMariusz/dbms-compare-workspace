@@ -11,7 +11,7 @@ class R4ProductDetailsCardTestCase(BaseTestCase):
         super().__init__(name="r4_product_details_card")
 
     def run_for_postgresql(self, connector: PostgresConnector) -> None:
-        connector.read_row(
+        connector.read_rows(
             query=(
                 "WITH selected_product AS ("
                 "SELECT "
@@ -25,17 +25,17 @@ class R4ProductDetailsCardTestCase(BaseTestCase):
                 "JOIN manufacturers mf ON mf.id_manufacturer = m.id_manufacturer "
                 "JOIN gear_specifications gs ON gs.id_specification = p.id_specification "
                 "ORDER BY p.id_product DESC LIMIT 1"
-                "), color_variants AS ("
-                "SELECT "
-                "p2.id_product, p2.color_name, p2.size_value, p2.stock_quantity, p2.price "
-                "FROM product p2 "
-                "JOIN selected_product sp ON sp.id_model = p2.id_model "
-                "ORDER BY p2.id_product"
                 ") "
-                "SELECT json_build_object("
-                "'product', (SELECT row_to_json(sp) FROM selected_product sp), "
-                "'variants', (SELECT COALESCE(json_agg(cv), '[]'::json) FROM color_variants cv)"
-                ") AS product_card"
+                "SELECT "
+                "sp.id_product AS product_id, sp.id_model, sp.id_specification, sp.color_name, sp.size_value, "
+                "sp.stock_quantity, sp.price, sp.description, "
+                "sp.model_name, sp.release_date, sp.id_manufacturer, sp.manufacturer_name, "
+                "sp.wheel_size, sp.number_of_wheels, sp.blade_material, sp.boot_material, sp.bearing_type, "
+                "p2.id_product AS variant_id_product, p2.color_name AS variant_color_name, "
+                "p2.size_value AS variant_size_value, p2.stock_quantity AS variant_stock_quantity, p2.price AS variant_price "
+                "FROM selected_product sp "
+                "JOIN product p2 ON p2.id_model = sp.id_model "
+                "ORDER BY p2.id_product"
             ),
         )
 
