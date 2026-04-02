@@ -41,9 +41,65 @@ class D3DeleteOrderItemTestCase(BaseTestCase):
                 self.order_item_id_to_delete,
             ),
         )
+    def prepare_for_mongodb(self, connector: MongoConnector) -> None:
+        selected_order = connector.read_latest("orders")
+        selected_product = connector.read_latest("product")
+
+        if selected_order is None:
+            raise ValueError("Failed to prepare D3 test case: could not find order")
+        if selected_product is None:
+            raise ValueError("Failed to prepare D3 test case: could not find product")
+
+        order_item_id = connector.get_next_business_id("order_items")
+        connector.insert_one(
+            collection_name="order_items",
+            document={
+                "id_order_item": order_item_id,
+                "id_order": selected_order["id_order"],
+                "id_product": selected_product["id_product"],
+                "quantity": 1,
+                "unit_price": selected_product["price"],
+            },
+        )
+        self.order_item_id_to_delete = order_item_id
+
+
+    def prepare_for_couchdb(self, connector: CouchConnector) -> None:
+        selected_order = connector.read_latest("orders")
+        selected_product = connector.read_latest("product")
+
+        if selected_order is None:
+            raise ValueError("Failed to prepare D3 test case: could not find order")
+        if selected_product is None:
+            raise ValueError("Failed to prepare D3 test case: could not find product")
+
+        order_item_id = connector.get_next_business_id("order_items")
+        connector.insert_one(
+            collection_name="order_items",
+            document={
+                "id_order_item": order_item_id,
+                "id_order": selected_order["id_order"],
+                "id_product": selected_product["id_product"],
+                "quantity": 1,
+                "unit_price": selected_product["price"],
+            },
+        )
+        self.order_item_id_to_delete = order_item_id
+
 
     def run_for_mongodb(self, connector: MongoConnector) -> None:
-        pass
+        if self.order_item_id_to_delete is None:
+            raise ValueError("D3 test case is not prepared: missing order item id to delete")
+        connector.delete_one(
+            collection_name="order_items",
+            filter_query={"id_order_item": self.order_item_id_to_delete},
+        )
+
 
     def run_for_couchdb(self, connector: CouchConnector) -> None:
-        pass
+        if self.order_item_id_to_delete is None:
+            raise ValueError("D3 test case is not prepared: missing order item id to delete")
+        connector.delete_one(
+            collection_name="order_items",
+            filter_query={"id_order_item": self.order_item_id_to_delete},
+        )

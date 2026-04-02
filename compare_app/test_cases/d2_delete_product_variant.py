@@ -52,8 +52,71 @@ class D2DeleteProductVariantTestCase(BaseTestCase):
             ),
         )
 
+    def prepare_for_mongodb(self, connector: MongoConnector) -> None:
+        selected_model = connector.read_latest("models")
+        selected_specification = connector.read_latest("gear_specifications")
+
+        if selected_model is None:
+            raise ValueError("Failed to prepare D2 test case: could not find model")
+        if selected_specification is None:
+            raise ValueError("Failed to prepare D2 test case: could not find specification")
+
+        product_id = connector.get_next_business_id("product")
+        connector.insert_one(
+            collection_name="product",
+            document={
+                "id_product": product_id,
+                "id_model": selected_model["id_model"],
+                "id_specification": selected_specification["id_specification"],
+                "color_name": "benchmark_d2",
+                "size_value": "42",
+                "stock_quantity": 10,
+                "price": 299.99,
+                "description": "benchmark_d2_delete_product_variant",
+            },
+        )
+        self.product_id_to_delete = product_id
+
+
+    def prepare_for_couchdb(self, connector: CouchConnector) -> None:
+        selected_model = connector.read_latest("models")
+        selected_specification = connector.read_latest("gear_specifications")
+
+        if selected_model is None:
+            raise ValueError("Failed to prepare D2 test case: could not find model")
+        if selected_specification is None:
+            raise ValueError("Failed to prepare D2 test case: could not find specification")
+
+        product_id = connector.get_next_business_id("product")
+        connector.insert_one(
+            collection_name="product",
+            document={
+                "id_product": product_id,
+                "id_model": selected_model["id_model"],
+                "id_specification": selected_specification["id_specification"],
+                "color_name": "benchmark_d2",
+                "size_value": "42",
+                "stock_quantity": 10,
+                "price": 299.99,
+                "description": "benchmark_d2_delete_product_variant",
+            },
+        )
+        self.product_id_to_delete = product_id
+
+
     def run_for_mongodb(self, connector: MongoConnector) -> None:
-        pass
+        if self.product_id_to_delete is None:
+            raise ValueError("D2 test case is not prepared: missing product id to delete")
+        connector.delete_one(
+            collection_name="product",
+            filter_query={"id_product": self.product_id_to_delete},
+        )
+
 
     def run_for_couchdb(self, connector: CouchConnector) -> None:
-        pass
+        if self.product_id_to_delete is None:
+            raise ValueError("D2 test case is not prepared: missing product id to delete")
+        connector.delete_one(
+            collection_name="product",
+            filter_query={"id_product": self.product_id_to_delete},
+        )

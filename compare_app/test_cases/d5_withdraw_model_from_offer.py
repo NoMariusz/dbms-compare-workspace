@@ -4,6 +4,7 @@ from connectors.couchdb import CouchConnector
 from connectors.mongodb import MongoConnector
 from connectors.postgres import PostgresConnector
 from test_cases.base import BaseTestCase
+from datetime import date, datetime
 
 
 class D5WithdrawModelFromOfferTestCase(BaseTestCase):
@@ -86,9 +87,234 @@ class D5WithdrawModelFromOfferTestCase(BaseTestCase):
                 self.model_id_to_delete,
             ),
         )
+            
+    def prepare_for_mongodb(self, connector: MongoConnector) -> None:
+        manufacturer_id = connector.get_next_business_id("manufacturers")
+        model_id = connector.get_next_business_id("models")
+        first_spec_id = connector.get_next_business_id("gear_specifications")
+        second_spec_id = first_spec_id + 1
+        first_product_id = connector.get_next_business_id("product")
+        second_product_id = first_product_id + 1
+        unique_suffix = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+
+        connector.insert_one(
+            collection_name="manufacturers",
+            document={
+                "id_manufacturer": manufacturer_id,
+                "name": f"benchmark_d5_mf_{unique_suffix}",
+            },
+        )
+
+        connector.insert_one(
+            collection_name="models",
+            document={
+                "id_model": model_id,
+                "id_manufacturer": manufacturer_id,
+                "model_name": f"benchmark_d5_model_{unique_suffix}",
+                "description": "benchmark_d5_withdraw_model_from_offer",
+                "release_date": date.today().isoformat(),
+            },
+        )
+
+        connector.insert_many(
+            collection_name="gear_specifications",
+            documents=[
+                {
+                    "id_specification": first_spec_id,
+                    "wheel_size": 84,
+                    "number_of_wheels": 4,
+                    "blade_material": "aluminium",
+                    "boot_material": "composite",
+                    "bearing_type": "ABEC-7",
+                },
+                {
+                    "id_specification": second_spec_id,
+                    "wheel_size": 90,
+                    "number_of_wheels": 4,
+                    "blade_material": "carbon",
+                    "boot_material": "composite",
+                    "bearing_type": "ILQ-9",
+                },
+            ],
+        )
+
+        connector.insert_many(
+            collection_name="product",
+            documents=[
+                {
+                    "id_product": first_product_id,
+                    "id_model": model_id,
+                    "id_specification": first_spec_id,
+                    "color_name": "benchmark_d5_color",
+                    "size_value": "42",
+                    "stock_quantity": 5,
+                    "price": 499.99,
+                    "description": "benchmark_d5_product",
+                },
+                {
+                    "id_product": second_product_id,
+                    "id_model": model_id,
+                    "id_specification": second_spec_id,
+                    "color_name": "benchmark_d5_color",
+                    "size_value": "42",
+                    "stock_quantity": 5,
+                    "price": 499.99,
+                    "description": "benchmark_d5_product",
+                },
+            ],
+        )
+
+        self.model_id_to_delete = model_id
+
+
+    def prepare_for_couchdb(self, connector: CouchConnector) -> None:
+        manufacturer_id = connector.get_next_business_id("manufacturers")
+        model_id = connector.get_next_business_id("models")
+        first_spec_id = connector.get_next_business_id("gear_specifications")
+        second_spec_id = first_spec_id + 1
+        first_product_id = connector.get_next_business_id("product")
+        second_product_id = first_product_id + 1
+        unique_suffix = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+
+        connector.insert_one(
+            collection_name="manufacturers",
+            document={
+                "id_manufacturer": manufacturer_id,
+                "name": f"benchmark_d5_mf_{unique_suffix}",
+            },
+        )
+
+        connector.insert_one(
+            collection_name="models",
+            document={
+                "id_model": model_id,
+                "id_manufacturer": manufacturer_id,
+                "model_name": f"benchmark_d5_model_{unique_suffix}",
+                "description": "benchmark_d5_withdraw_model_from_offer",
+                "release_date": date.today().isoformat(),
+            },
+        )
+
+        connector.insert_many(
+            collection_name="gear_specifications",
+            documents=[
+                {
+                    "id_specification": first_spec_id,
+                    "wheel_size": 84,
+                    "number_of_wheels": 4,
+                    "blade_material": "aluminium",
+                    "boot_material": "composite",
+                    "bearing_type": "ABEC-7",
+                },
+                {
+                    "id_specification": second_spec_id,
+                    "wheel_size": 90,
+                    "number_of_wheels": 4,
+                    "blade_material": "carbon",
+                    "boot_material": "composite",
+                    "bearing_type": "ILQ-9",
+                },
+            ],
+        )
+
+        connector.insert_many(
+            collection_name="product",
+            documents=[
+                {
+                    "id_product": first_product_id,
+                    "id_model": model_id,
+                    "id_specification": first_spec_id,
+                    "color_name": "benchmark_d5_color",
+                    "size_value": "42",
+                    "stock_quantity": 5,
+                    "price": 499.99,
+                    "description": "benchmark_d5_product",
+                },
+                {
+                    "id_product": second_product_id,
+                    "id_model": model_id,
+                    "id_specification": second_spec_id,
+                    "color_name": "benchmark_d5_color",
+                    "size_value": "42",
+                    "stock_quantity": 5,
+                    "price": 499.99,
+                    "description": "benchmark_d5_product",
+                },
+            ],
+        )
+
+        self.model_id_to_delete = model_id
+
 
     def run_for_mongodb(self, connector: MongoConnector) -> None:
-        pass
+        if self.model_id_to_delete is None:
+            raise ValueError("D5 test case is not prepared: missing model id to delete")
+
+        model_products = connector.read_many(
+            collection_name="product",
+            filter_query={"id_model": self.model_id_to_delete},
+            projection={"id_product": 1, "id_specification": 1, "_id": 0},
+        )
+        specification_ids = sorted(
+            {product["id_specification"] for product in model_products if "id_specification" in product}
+        )
+
+        if model_products:
+            connector.delete_many(
+                collection_name="product",
+                filter_query={"id_model": self.model_id_to_delete},
+            )
+
+        for specification_id in specification_ids:
+            still_used = connector.read_one(
+                collection_name="product",
+                filter_query={"id_specification": specification_id},
+                projection={"id_product": 1, "_id": 0},
+            )
+            if still_used is None:
+                connector.delete_one(
+                    collection_name="gear_specifications",
+                    filter_query={"id_specification": specification_id},
+                )
+
+        connector.delete_one(
+            collection_name="models",
+            filter_query={"id_model": self.model_id_to_delete},
+        )
+
 
     def run_for_couchdb(self, connector: CouchConnector) -> None:
-        pass
+        if self.model_id_to_delete is None:
+            raise ValueError("D5 test case is not prepared: missing model id to delete")
+
+        model_products = connector.read_many(
+            collection_name="product",
+            filter_query={"id_model": self.model_id_to_delete},
+            projection={"id_product": 1, "id_specification": 1, "_id": 0},
+        )
+        specification_ids = sorted(
+            {product["id_specification"] for product in model_products if "id_specification" in product}
+        )
+
+        if model_products:
+            connector.delete_many(
+                collection_name="product",
+                filter_query={"id_model": self.model_id_to_delete},
+            )
+
+        for specification_id in specification_ids:
+            still_used = connector.read_one(
+                collection_name="product",
+                filter_query={"id_specification": specification_id},
+                projection={"id_product": 1, "_id": 0},
+            )
+            if still_used is None:
+                connector.delete_one(
+                    collection_name="gear_specifications",
+                    filter_query={"id_specification": specification_id},
+                )
+
+        connector.delete_one(
+            collection_name="models",
+            filter_query={"id_model": self.model_id_to_delete},
+        )

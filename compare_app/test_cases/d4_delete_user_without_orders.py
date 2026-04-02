@@ -4,7 +4,7 @@ from connectors.couchdb import CouchConnector
 from connectors.mongodb import MongoConnector
 from connectors.postgres import PostgresConnector
 from test_cases.base import BaseTestCase
-
+from datetime import datetime
 
 class D4DeleteUserWithoutOrdersTestCase(BaseTestCase):
     def __init__(self) -> None:
@@ -44,9 +44,70 @@ class D4DeleteUserWithoutOrdersTestCase(BaseTestCase):
                 self.user_id_to_delete,
             ),
         )
+        
+    def prepare_for_mongodb(self, connector: MongoConnector) -> None:
+        user_id = connector.get_next_business_id("users")
+        unique_suffix = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+
+        connector.insert_one(
+            collection_name="users",
+            document={
+                "id_user": user_id,
+                "username": "benchmark_d4_delete_user",
+                "email": f"benchmark_d4_{unique_suffix}@example.com",
+                "password": "benchmark_password",
+                "phone": "+10000000001",
+                "id_role": 2,
+            },
+        )
+        self.user_id_to_delete = user_id
+
+
+    def prepare_for_couchdb(self, connector: CouchConnector) -> None:
+        user_id = connector.get_next_business_id("users")
+        unique_suffix = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+
+        connector.insert_one(
+            collection_name="users",
+            document={
+                "id_user": user_id,
+                "username": "benchmark_d4_delete_user",
+                "email": f"benchmark_d4_{unique_suffix}@example.com",
+                "password": "benchmark_password",
+                "phone": "+10000000001",
+                "id_role": 2,
+            },
+        )
+        self.user_id_to_delete = user_id
+
 
     def run_for_mongodb(self, connector: MongoConnector) -> None:
-        pass
+        if self.user_id_to_delete is None:
+            raise ValueError("D4 test case is not prepared: missing user id to delete")
+
+        user_orders = connector.read_one(
+            collection_name="orders",
+            filter_query={"id_user": self.user_id_to_delete},
+            projection={"id_order": 1, "_id": 0},
+        )
+        if user_orders is None:
+            connector.delete_one(
+                collection_name="users",
+                filter_query={"id_user": self.user_id_to_delete},
+            )
+
 
     def run_for_couchdb(self, connector: CouchConnector) -> None:
-        pass
+        if self.user_id_to_delete is None:
+            raise ValueError("D4 test case is not prepared: missing user id to delete")
+
+        user_orders = connector.read_one(
+            collection_name="orders",
+            filter_query={"id_user": self.user_id_to_delete},
+            projection={"id_order": 1, "_id": 0},
+        )
+        if user_orders is None:
+            connector.delete_one(
+                collection_name="users",
+                filter_query={"id_user": self.user_id_to_delete},
+            )
