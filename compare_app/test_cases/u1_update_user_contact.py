@@ -30,8 +30,35 @@ class U1UpdateUserContactTestCase(BaseTestCase):
             ),
         )
 
+    def prepare_for_mongodb(self, connector: MongoConnector) -> None:
+        connector.update_one(
+            collection_name="users",
+            filter_query={"id_user": int(self._payload()["target_id"])},
+            update_query={"$set": {"phone": "+10000000000"}},
+        )
+
+
+    def prepare_for_couchdb(self, connector: CouchConnector) -> None:
+        connector.update_one(
+            collection_name="users",
+            filter_query={"id_user": int(self._payload()["target_id"])},
+            update_query={"$set": {"phone": "+10000000000"}},
+        )
+
+
     def run_for_mongodb(self, connector: MongoConnector) -> None:
-        pass
+        payload = self._payload()
+        connector.update_one(
+            collection_name="users",
+            filter_query={"id_user": int(payload["target_id"])},
+            update_query={"$set": {"phone": payload["new_phone"]}},
+        )
+
 
     def run_for_couchdb(self, connector: CouchConnector) -> None:
-        pass
+        payload = self._payload()
+        connector.update_one(
+            collection_name="users",
+            filter_query={"id_user": int(payload["target_id"])},
+            update_query={"$set": {"phone": payload["new_phone"]}},
+        )

@@ -43,8 +43,84 @@ class U3ReduceVariantStockAfterSaleTestCase(BaseTestCase):
             ),
         )
 
+    def _latest_model_id(self, connector) -> int | None:
+        models = connector.read_many(
+            collection_name="models",
+            filter_query={"model_name": self._payload()["model_name"]},
+            projection={"_id": 0, "id_model": 1},
+        )
+        if not models:
+            return None
+        return max(int(model["id_model"]) for model in models if "id_model" in model)
+
+
+    def _latest_variant(self, connector) -> dict | None:
+        model_id = self._latest_model_id(connector)
+        if model_id is None:
+            return None
+
+        variants = connector.read_many(
+            collection_name="product",
+            filter_query={
+                "id_model": model_id,
+                "color_name": self._payload()["color_name"],
+                "size_value": self._payload()["size_value"],
+            },
+            projection={"_id": 0, "id_product": 1, "stock_quantity": 1},
+        )
+        if not variants:
+            return None
+
+        return max(variants, key=lambda variant: int(variant["id_product"]))
+
+
+    def prepare_for_mongodb(self, connector: MongoConnector) -> None:
+        variant = self._latest_variant(connector)
+        if variant is None:
+            return
+
+        connector.update_one(
+            collection_name="product",
+            filter_query={"id_product": variant["id_product"]},
+            update_query={"$set": {"stock_quantity": 20}},
+        )
+
+
+    def prepare_for_couchdb(self, connector: CouchConnector) -> None:
+        variant = self._latest_variant(connector)
+        if variant is None:
+            return
+
+        connector.update_one(
+            collection_name="product",
+            filter_query={"id_product": variant["id_product"]},
+            update_query={"$set": {"stock_quantity": 20}},
+        )
+
+
     def run_for_mongodb(self, connector: MongoConnector) -> None:
-        pass
+        variant = self._latest_variant(connector)
+        if variant is None:
+            return
+
+        new_stock = max(int(variant["stock_quantity"]) - int(self._payload()["sold_quantity"]), 0)
+
+        connector.update_one(
+            collection_name="product",
+            filter_query={"id_product": variant["id_product"]},
+            update_query={"$set": {"stock_quantity": new_stock}},
+        )
+
 
     def run_for_couchdb(self, connector: CouchConnector) -> None:
-        pass
+        variant = self._latest_variant(connector)
+        if variant is None:
+            return
+
+        new_stock = max(int(variant["stock_quantity"]) - int(self._payload()["sold_quantity"]), 0)
+
+        connector.update_one(
+            collection_name="product",
+            filter_query={"id_product": variant["id_product"]},
+            update_query={"$set": {"stock_quantity": new_stock}},
+        )

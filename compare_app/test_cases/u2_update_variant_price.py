@@ -37,8 +37,72 @@ class U2UpdateVariantPriceTestCase(BaseTestCase):
             ),
         )
 
+    def _latest_model_id(self, connector) -> int | None:
+        models = connector.read_many(
+            collection_name="models",
+            filter_query={"model_name": self._payload()["model_name"]},
+            projection={"_id": 0, "id_model": 1},
+        )
+        if not models:
+            return None
+        return max(int(model["id_model"]) for model in models if "id_model" in model)
+
+
+    def prepare_for_mongodb(self, connector: MongoConnector) -> None:
+        model_id = self._latest_model_id(connector)
+        if model_id is None:
+            return
+
+        connector.update_many(
+            collection_name="product",
+            filter_query={
+                "id_model": model_id,
+                "color_name": self._payload()["color_name"],
+            },
+            update_query={"$set": {"price": 899.99}},
+        )
+
+
+    def prepare_for_couchdb(self, connector: CouchConnector) -> None:
+        model_id = self._latest_model_id(connector)
+        if model_id is None:
+            return
+
+        connector.update_many(
+            collection_name="product",
+            filter_query={
+                "id_model": model_id,
+                "color_name": self._payload()["color_name"],
+            },
+            update_query={"$set": {"price": 899.99}},
+        )
+
+
     def run_for_mongodb(self, connector: MongoConnector) -> None:
-        pass
+        model_id = self._latest_model_id(connector)
+        if model_id is None:
+            return
+
+        connector.update_many(
+            collection_name="product",
+            filter_query={
+                "id_model": model_id,
+                "color_name": self._payload()["color_name"],
+            },
+            update_query={"$set": {"price": self._payload()["new_price"]}},
+        )
+
 
     def run_for_couchdb(self, connector: CouchConnector) -> None:
-        pass
+        model_id = self._latest_model_id(connector)
+        if model_id is None:
+            return
+
+        connector.update_many(
+            collection_name="product",
+            filter_query={
+                "id_model": model_id,
+                "color_name": self._payload()["color_name"],
+            },
+            update_query={"$set": {"price": self._payload()["new_price"]}},
+        )

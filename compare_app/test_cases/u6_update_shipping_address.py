@@ -31,8 +31,51 @@ class U6UpdateShippingAddressTestCase(BaseTestCase):
             ),
         )
 
+    def prepare_for_mongodb(self, connector: MongoConnector) -> None:
+        connector.update_one(
+            collection_name="orders",
+            filter_query={"id_order": int(self._payload()["target_order_id"])},
+            update_query={
+                "$set": {
+                    "shipping_address": "Original benchmark address",
+                    "id_status": 1,
+                }
+            },
+        )
+
+
+    def prepare_for_couchdb(self, connector: CouchConnector) -> None:
+        connector.update_one(
+            collection_name="orders",
+            filter_query={"id_order": int(self._payload()["target_order_id"])},
+            update_query={
+                "$set": {
+                    "shipping_address": "Original benchmark address",
+                    "id_status": 1,
+                }
+            },
+        )
+
+
     def run_for_mongodb(self, connector: MongoConnector) -> None:
-        pass
+        payload = self._payload()
+        connector.update_one(
+            collection_name="orders",
+            filter_query={
+                "id_order": int(payload["target_order_id"]),
+                "id_status": {"$in": [1, 2]},
+            },
+            update_query={"$set": {"shipping_address": payload["new_shipping_address"]}},
+        )
+
 
     def run_for_couchdb(self, connector: CouchConnector) -> None:
-        pass
+        payload = self._payload()
+        connector.update_one(
+            collection_name="orders",
+            filter_query={
+                "id_order": int(payload["target_order_id"]),
+                "id_status": {"$in": [1, 2]},
+            },
+            update_query={"$set": {"shipping_address": payload["new_shipping_address"]}},
+        )

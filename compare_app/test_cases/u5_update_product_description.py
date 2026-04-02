@@ -40,8 +40,35 @@ class U5UpdateProductDescriptionTestCase(BaseTestCase):
             ),
         )
 
+    def prepare_for_mongodb(self, connector: MongoConnector) -> None:
+        connector.update_one(
+            collection_name="product",
+            filter_query={"id_product": int(self._payload()["target_product_id"])},
+            update_query={"$set": {"description": "Original benchmark description"}},
+        )
+
+
+    def prepare_for_couchdb(self, connector: CouchConnector) -> None:
+        connector.update_one(
+            collection_name="product",
+            filter_query={"id_product": int(self._payload()["target_product_id"])},
+            update_query={"$set": {"description": "Original benchmark description"}},
+        )
+
+
     def run_for_mongodb(self, connector: MongoConnector) -> None:
-        pass
+        payload = self._payload()
+        connector.update_one(
+            collection_name="product",
+            filter_query={"id_product": int(payload["target_product_id"])},
+            update_query={"$set": {"description": payload["new_description"]}},
+        )
+
 
     def run_for_couchdb(self, connector: CouchConnector) -> None:
-        pass
+        payload = self._payload()
+        connector.update_one(
+            collection_name="product",
+            filter_query={"id_product": int(payload["target_product_id"])},
+            update_query={"$set": {"description": payload["new_description"]}},
+        )
