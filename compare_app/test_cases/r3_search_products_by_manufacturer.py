@@ -44,9 +44,10 @@ class R3SearchProductsByManufacturerTestCase(BaseTestCase):
         models_by_id = {model["id_model"]: model for model in models}
         model_ids = list(models_by_id.keys())
 
-        products = connector.read_many(
+        products = connector.read_many_in_batches(
             collection_name="product",
-            filter_query={"id_model": {"$in": model_ids}},
+            field_name="id_model",
+            values=model_ids,
             projection={
                 "_id": 0,
                 "id_product": 1,
@@ -56,8 +57,10 @@ class R3SearchProductsByManufacturerTestCase(BaseTestCase):
                 "stock_quantity": 1,
                 "price": 1,
             },
-            sort=[("id_product", 1)],
+            chunk_size=5000,
         )
+
+        products.sort(key=lambda product: int(product["id_product"]))
 
         _ = [
             {

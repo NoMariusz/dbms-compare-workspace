@@ -58,10 +58,12 @@ class R6StaleInventoryReportTestCase(BaseTestCase):
         if not product_ids:
             return
 
-        order_items = connector.read_many(
+        order_items = connector.read_many_in_batches(
             collection_name="order_items",
-            filter_query={"id_product": {"$in": product_ids}},
+            field_name="id_product",
+            values=product_ids,
             projection={"_id": 0, "id_product": 1, "id_order": 1},
+            chunk_size=5000,
         )
 
         order_ids = sorted(

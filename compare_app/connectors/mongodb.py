@@ -110,6 +110,53 @@ class MongoConnector(BaseConnector):
         result = dict(document)
         result.pop("_id", None)
         return result
+        
+    def _chunk_values(self, values: list[Any], chunk_size: int) -> list[list[Any]]:
+        return [values[i:i + chunk_size] for i in range(0, len(values), chunk_size)]
+
+
+    def read_many_in_batches(
+        self,
+        collection_name: str,
+        field_name: str,
+        values: list[Any],
+        projection: dict[str, int] | None = None,
+        sort: list[tuple[str, int]] | None = None,
+        chunk_size: int = 5000,
+    ) -> list[dict[str, Any]]:
+        if not values:
+            return []
+
+        results: list[dict[str, Any]] = []
+        for chunk in self._chunk_values(values, chunk_size):
+            results.extend(
+                self.read_many(
+                    collection_name=collection_name,
+                    filter_query={field_name: {"$in": chunk}},
+                    projection=projection,
+                    sort=sort,
+                )
+            )
+        return results
+
+
+    def delete_many_in_batches(
+        self,
+        collection_name: str,
+        field_name: str,
+        values: list[Any],
+        chunk_size: int = 5000,
+    ) -> int:
+        if not values:
+            return 0
+
+        deleted_total = 0
+        for chunk in self._chunk_values(values, chunk_size):
+            deleted_total += self.delete_many(
+                collection_name=collection_name,
+                filter_query={field_name: {"$in": chunk}},
+            )
+        return deleted_total
 
     def insert_one_ignore_duplicates(self, collection_name: str, document: dict[str, Any]) -> bool:
         if self._pymongo is None:

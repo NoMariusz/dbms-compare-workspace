@@ -42,9 +42,10 @@ class R2ListProductsByTypeTestCase(BaseTestCase):
         if not model_ids:
             return
 
-        connector.read_many(
+        products = connector.read_many_in_batches(
             collection_name="product",
-            filter_query={"id_model": {"$in": model_ids}},
+            field_name="id_model",
+            values=model_ids,
             projection={
                 "_id": 0,
                 "id_product": 1,
@@ -56,8 +57,11 @@ class R2ListProductsByTypeTestCase(BaseTestCase):
                 "price": 1,
                 "description": 1,
             },
-            sort=[("id_product", 1)],
+            chunk_size=5000,
         )
+
+        products.sort(key=lambda product: int(product["id_product"]))
+        _ = products
 
 
     def run_for_couchdb(self, connector: CouchConnector) -> None:
