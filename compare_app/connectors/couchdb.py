@@ -106,11 +106,32 @@ class CouchConnector(BaseConnector):
 
         self._delete_database_if_exists()
         self._create_database()
+        self._restore_documents(documents)
         self._restore_indexes(indexes)
         self._ensure_runtime_indexes()
-        self._restore_documents(documents)
 
         self.connect()
+        self._wait_until_query_ready()
+        
+    def _wait_until_query_ready(self) -> None:
+        attempts = 120
+        delay_seconds = 10.0
+
+        for _ in range(attempts):
+            try:
+                self.read_one(
+                    collection_name="users",
+                    filter_query={"email": "benchmark_user@example.com"},
+                    projection={"_id": 0, "id_user": 1},
+                )
+                return
+            except RuntimeError as exc:
+                if self._is_timeout_error(exc):
+                    time.sleep(delay_seconds)
+                    continue
+                raise
+
+        raise RuntimeError("CouchDB did not become query-ready after restore within the expected time.")
 
     def _resolve_backup_path(self, size_label: str) -> Path:
         return Path(f"./data/db_backups/couchdb_{size_label}.json")
@@ -279,8 +300,8 @@ class CouchConnector(BaseConnector):
         sort: list[dict[str, str]] | None = None,
         limit: int = 1_000_000,
         use_index: str | None = None,
-        retries: int = 6,
-        retry_delay: float = 2.0,
+        retries: int = 60,
+        retry_delay: float = 10.0,
     ) -> list[dict[str, Any]]:
         payload: dict[str, Any] = {
             "selector": selector,
@@ -564,3 +585,28 @@ class CouchConnector(BaseConnector):
             raise ValueError(f"Field {id_field} in collection {collection_name} is not an integer.")
 
         return current_value + 1
+    
+    def delete_by_doc_id(self, doc_id: str) -> int:
+        encoded_doc_id = parse.quote(doc_id, safe="")
+        try:
+            document = self._request_json("GET", f"/{self.database_name}/{encoded_doc_id}")
+        except RuntimeError as exc:
+            text = str(exc)
+            if "404" in text or "not_found" in text:
+                return 0
+            raise
+
+        self._request_json(
+            method="DELETE",
+            path=f"/{self.database_name}/{encoded_doc_id}?rev={document['_rev']}",
+        )
+        return 1
+
+
+    def delete_one_by_business_id(self, collection_name: str, business_id: int) -> int:
+        id_field = self._ID_FIELD_BY_COLLECTION.get(collection_name)
+        if id_field is None:
+            raise ValueError(f"No business id field configured for collection: {collection_name}")
+
+        doc_id = f"{collection_name}:{business_id}"
+        return self.delete_by_doc_id(doc_id)
