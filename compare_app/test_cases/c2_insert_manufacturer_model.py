@@ -53,14 +53,7 @@ class C2InsertManufacturerModelTestCase(BaseTestCase):
 
 
     def prepare_for_couchdb(self, connector: CouchConnector) -> None:
-        connector.delete_many(
-            collection_name="models",
-            filter_query={"model_name": self._model_payload()["model_name"]},
-        )
-        connector.delete_many(
-            collection_name="manufacturers",
-            filter_query={"name": self._manufacturer_name()},
-        )
+        pass
 
 
     def run_for_mongodb(self, connector: MongoConnector) -> None:

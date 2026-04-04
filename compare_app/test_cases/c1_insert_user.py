@@ -62,7 +62,7 @@ class C1InsertUserTestCase(BaseTestCase):
 
 
     def prepare_for_couchdb(self, connector: CouchConnector) -> None:
-        connector.delete_many(
+        connector.delete_one_by_business_id(
             collection_name="users",
-            filter_query={"id_user": self._payload()["id_user"]},
+            business_id=int(self._payload()["id_user"]),
         )

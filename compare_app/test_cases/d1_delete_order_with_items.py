@@ -146,7 +146,7 @@ class D1DeleteOrderWithItemsTestCase(BaseTestCase):
             collection_name="order_items",
             filter_query={"id_order": self.order_id_to_delete},
         )
-        connector.delete_one(
+        connector.delete_one_by_business_id(
             collection_name="orders",
-            filter_query={"id_order": self.order_id_to_delete},
+            business_id=self.order_id_to_delete,
         )

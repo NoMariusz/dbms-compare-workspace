@@ -107,7 +107,7 @@ class D4DeleteUserWithoutOrdersTestCase(BaseTestCase):
             projection={"id_order": 1, "_id": 0},
         )
         if user_orders is None:
-            connector.delete_one(
+            connector.delete_one_by_business_id(
                 collection_name="users",
-                filter_query={"id_user": self.user_id_to_delete},
-            )
+                business_id=self.user_id_to_delete,
+            )   

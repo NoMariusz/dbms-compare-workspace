@@ -99,7 +99,7 @@ class D3DeleteOrderItemTestCase(BaseTestCase):
     def run_for_couchdb(self, connector: CouchConnector) -> None:
         if self.order_item_id_to_delete is None:
             raise ValueError("D3 test case is not prepared: missing order item id to delete")
-        connector.delete_one(
+        connector.delete_one_by_business_id(
             collection_name="order_items",
-            filter_query={"id_order_item": self.order_item_id_to_delete},
+            business_id=self.order_item_id_to_delete,
         )

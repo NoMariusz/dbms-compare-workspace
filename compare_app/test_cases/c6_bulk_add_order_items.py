@@ -119,55 +119,7 @@ class C6BulkAddOrderItemsTestCase(BaseTestCase):
 
 
     def prepare_for_couchdb(self, connector: CouchConnector) -> None:
-        payload = self._payload()
-
-        latest_order = connector.read_latest("orders")
-        if latest_order is None:
-            return
-
-        benchmark_products = connector.read_many(
-            collection_name="product",
-            filter_query={"description": payload["description"]},
-            projection={"id_product": 1, "_id": 0},
-        )
-        benchmark_product_ids = [
-            product["id_product"] for product in benchmark_products if "id_product" in product
-        ]
-
-        if benchmark_product_ids:
-            connector.delete_many(
-                collection_name="order_items",
-                filter_query={
-                    "id_order": latest_order["id_order"],
-                    "id_product": {"$in": benchmark_product_ids},
-                },
-            )
-
-        remaining_items = connector.read_many(
-            collection_name="order_items",
-            filter_query={"id_order": latest_order["id_order"]},
-            projection={
-                "_id": 0,
-                "quantity": 1,
-                "unit_price": 1,
-            },
-        )
-        recalculated_total = sum(
-            float(item["unit_price"]) * int(item["quantity"])
-            for item in remaining_items
-        )
-
-        connector.update_one(
-            collection_name="orders",
-            filter_query={"id_order": latest_order["id_order"]},
-            update_query={"$set": {"total_amount": recalculated_total}},
-        )
-
-        if benchmark_product_ids:
-            connector.delete_many(
-                collection_name="product",
-                filter_query={"id_product": {"$in": benchmark_product_ids}},
-            )
+        pass
 
 
     def run_for_mongodb(self, connector: MongoConnector) -> None:

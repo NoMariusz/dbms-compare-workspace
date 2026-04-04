@@ -64,21 +64,7 @@ class C5CreateOrderWithOneItemTestCase(BaseTestCase):
 
 
     def prepare_for_couchdb(self, connector: CouchConnector) -> None:
-        benchmark_orders = connector.read_many(
-            collection_name="orders",
-            filter_query={"shipping_address": self._payload()["shipping_address"]},
-            projection={"id_order": 1, "_id": 0},
-        )
-        order_ids = [order["id_order"] for order in benchmark_orders if "id_order" in order]
-        if order_ids:
-            connector.delete_many(
-                collection_name="order_items",
-                filter_query={"id_order": {"$in": order_ids}},
-            )
-            connector.delete_many(
-                collection_name="orders",
-                filter_query={"id_order": {"$in": order_ids}},
-            )
+        pass
 
 
     def run_for_mongodb(self, connector: MongoConnector) -> None:

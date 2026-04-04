@@ -74,14 +74,7 @@ class C3InsertProductWithSpecificationTestCase(BaseTestCase):
 
 
     def prepare_for_couchdb(self, connector: CouchConnector) -> None:
-        connector.delete_many(
-            collection_name="product",
-            filter_query={"description": self._product_payload()["description"]},
-        )
-        connector.delete_many(
-            collection_name="gear_specifications",
-            filter_query={"bearing_type": self._spec_payload()["bearing_type"]},
-        )
+        pass
 
 
     def run_for_mongodb(self, connector: MongoConnector) -> None:

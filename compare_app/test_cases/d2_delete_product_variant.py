@@ -116,7 +116,7 @@ class D2DeleteProductVariantTestCase(BaseTestCase):
     def run_for_couchdb(self, connector: CouchConnector) -> None:
         if self.product_id_to_delete is None:
             raise ValueError("D2 test case is not prepared: missing product id to delete")
-        connector.delete_one(
+        connector.delete_one_by_business_id(
             collection_name="product",
-            filter_query={"id_product": self.product_id_to_delete},
+            business_id=self.product_id_to_delete,
         )

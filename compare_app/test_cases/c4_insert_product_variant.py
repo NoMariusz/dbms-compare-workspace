@@ -52,10 +52,7 @@ class C4InsertProductVariantTestCase(BaseTestCase):
 
 
     def prepare_for_couchdb(self, connector: CouchConnector) -> None:
-        connector.delete_many(
-            collection_name="product",
-            filter_query={"description": self._variant_payload()["description"]},
-        )
+        pass
 
 
     def run_for_mongodb(self, connector: MongoConnector) -> None:

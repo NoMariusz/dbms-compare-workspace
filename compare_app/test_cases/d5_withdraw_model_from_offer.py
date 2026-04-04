@@ -309,12 +309,12 @@ class D5WithdrawModelFromOfferTestCase(BaseTestCase):
                 projection={"id_product": 1, "_id": 0},
             )
             if still_used is None:
-                connector.delete_one(
+                connector.delete_one_by_business_id(
                     collection_name="gear_specifications",
-                    filter_query={"id_specification": specification_id},
+                    business_id=specification_id,
                 )
 
-        connector.delete_one(
+        connector.delete_one_by_business_id(
             collection_name="models",
-            filter_query={"id_model": self.model_id_to_delete},
+            business_id=self.model_id_to_delete,
         )
