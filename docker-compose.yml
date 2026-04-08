@@ -45,6 +45,11 @@ services:
             COUCHDB_PASSWORD: password123
             COUCHDB_DB: skates_shop
             COUCHDB_DB_WITHOUT_INDEXES: skates_shop_without_indexes
+            COUCHDB_DB_ROLES: skates_shop_roles
+            COUCHDB_ROLES_DB_USER: moderator_user
+            COUCHDB_ROLES_DB_PASSWORD: moderator_password123
+            COUCHDB_STANDARD_DB_USER: standard_user
+            COUCHDB_STANDARD_DB_PASSWORD: standard_password123
         volumes:
             - ./couchdb/init:/seed
         entrypoint: ['/bin/sh', '/seed/init-couchdb.sh']

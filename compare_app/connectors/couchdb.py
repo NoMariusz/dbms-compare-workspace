@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -53,9 +54,14 @@ class CouchConnector(BaseConnector):
         super().__init__(dbms_type=DBMSType.CouchDB, name=DBMSType.CouchDB.name)
         self.host = host
         self.port = port
+        self.admin_user = user
+        self.admin_password = password
         self.user = user
         self.password = password
         self.database_name = config.COUCHDB_DATABASE
+        if self.database_name == "skates_shop_roles":
+            self.user = os.getenv("COUCHDB_ROLES_DB_USER", "moderator_user")
+            self.password = os.getenv("COUCHDB_ROLES_DB_PASSWORD", "moderator_password123")
 
     def connect(self) -> None:
         print(
@@ -134,7 +140,7 @@ class CouchConnector(BaseConnector):
         raise RuntimeError("CouchDB did not become query-ready after restore within the expected time.")
 
     def _resolve_backup_path(self, size_label: str) -> Path:
-        return Path(f"./data/db_backups/{self.database_name}/couchdb_{size_label}.json")
+        return Path(f"./data/db_backups/{self.database_name}/couchdb_{self.database_name}_{size_label}.json")
 
     def _base_url(self) -> str:
         return f"http://{self.host}:{self.port}"

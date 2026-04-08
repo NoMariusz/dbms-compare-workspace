@@ -499,7 +499,7 @@ def populate_database(size: int, batch_size: int, reset: bool, database_name: st
 def export_backup(size_label: str, output_dir: Path, database_name: str | None = None) -> Path:
     selected_database_name = database_name or _env("COUCHDB_DB", "skates_shop")
     output_dir.mkdir(parents=True, exist_ok=True)
-    backup_path = output_dir / f"couchdb_{selected_database_name}_{size_label}.json"
+    backup_path = output_dir / f"couchdb_{size_label}.json"
 
     payload = _build_backup_payload(selected_database_name)
     with backup_path.open("w", encoding="utf-8") as backup_file:
