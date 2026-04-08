@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import math
+
 from config import NUMER_OF_TEST_RUNS
 from connectors.base import BaseConnector
 from constants import DBDataSize
 from data_manager import DataManager
 from test_cases.base import BaseTestCase
 
-import math
 
 def _is_timeout_exception(exc: Exception) -> bool:
     text = str(exc)
@@ -53,6 +54,7 @@ class BenchmarkRunner:
                         average_duration = math.inf
 
                         try:
+                            print(f"DEBUG: Running test case {test_case.name} for {connector.name} / size={size_label}...")
                             # warm-up run not included in final score
                             test_case.prepare(connector)
                             test_case.run(connector)

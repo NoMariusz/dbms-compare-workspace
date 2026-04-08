@@ -16,6 +16,11 @@ until curl -fsS "${COUCH_URL}/" >/dev/null; do
   sleep 2
 done
 
+# Ensure system databases required for auth/user docs exist
+curl -fsS -X PUT "${COUCH_URL}/_users" >/dev/null 2>&1 || true
+curl -fsS -X PUT "${COUCH_URL}/_replicator" >/dev/null 2>&1 || true
+curl -fsS -X PUT "${COUCH_URL}/_global_changes" >/dev/null 2>&1 || true
+
 # Create business databases if they do not exist
 curl -fsS -X PUT "${COUCH_URL}/${DB}" >/dev/null 2>&1 || true
 curl -fsS -X PUT "${COUCH_URL}/${DB_WITHOUT_INDEXES}" >/dev/null 2>&1 || true

@@ -4,11 +4,11 @@ import subprocess
 from pathlib import Path
 
 # DB_NAMES = ["skates_shop", "skates_shop_without_indexes", "skates_shop_roles", "skates_shop_encrypted"]
-DB_NAMES = ["skates_shop_encrypted"]
+DB_NAMES = ["skates_shop_without_indexes", "skates_shop_roles", "skates_shop_encrypted"]
 # SIZES = [500_000, 1_000_000, 10_000_000]
-SIZES = [1_000_000]
+SIZES = [500_000]
 # SIZE_NAMES = ["500k", "1m", "10m"]
-SIZE_NAMES = [ "1m"]
+SIZE_NAMES = [ "500k"]
 
 BATCH_SIZE = 5000
 MONGO_CONTAINER = "mongodb_lts"

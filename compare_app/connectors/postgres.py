@@ -118,12 +118,20 @@ class PostgresConnector(BaseConnector):
             return query
         
         import re
-        query = re.sub(r'\bFROM\s+users\b', 'FROM users_decrypted', query, flags=re.IGNORECASE)
-        query = re.sub(r'\bJOIN\s+users\b', 'JOIN users_decrypted', query, flags=re.IGNORECASE)
+        sensitive_field_pattern = r'\b(email|password|phone|shipping_address)\b'
+        requires_decrypted_reads = re.search(sensitive_field_pattern, query, flags=re.IGNORECASE) is not None
+
+        if requires_decrypted_reads:
+            query = re.sub(r'\bFROM\s+users\b', 'FROM users_decrypted', query, flags=re.IGNORECASE)
+            query = re.sub(r'\bJOIN\s+users\b', 'JOIN users_decrypted', query, flags=re.IGNORECASE)
+            query = re.sub(r'\bFROM\s+orders\b', 'FROM orders_decrypted', query, flags=re.IGNORECASE)
+            query = re.sub(r'\bJOIN\s+orders\b', 'JOIN orders_decrypted', query, flags=re.IGNORECASE)
+
+        # Writes targeting sensitive fields must go through decrypted updatable views.
         query = re.sub(r'\bINTO\s+users\b', 'INTO users_decrypted', query, flags=re.IGNORECASE)
-        query = re.sub(r'\bFROM\s+orders\b', 'FROM orders_decrypted', query, flags=re.IGNORECASE)
-        query = re.sub(r'\bJOIN\s+orders\b', 'JOIN orders_decrypted', query, flags=re.IGNORECASE)
         query = re.sub(r'\bINTO\s+orders\b', 'INTO orders_decrypted', query, flags=re.IGNORECASE)
+        query = re.sub(r'\bUPDATE\s+users\b', 'UPDATE users_decrypted', query, flags=re.IGNORECASE)
+        query = re.sub(r'\bUPDATE\s+orders\b', 'UPDATE orders_decrypted', query, flags=re.IGNORECASE)
         return query
     
     # CRUD helper methods for test cases

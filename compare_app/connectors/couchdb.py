@@ -72,6 +72,7 @@ class CouchConnector(BaseConnector):
         self.password = password
         self.database_name = config.COUCHDB_DATABASE
         self.is_encrypted_db = self.database_name == self._ENCRYPTED_DB_NAME
+        self.is_without_indexes_db = self.database_name.endswith("_without_indexes")
         self._encryption_key = self._build_encryption_key()
         if self.database_name == "skates_shop_roles":
             self.user = os.getenv("COUCHDB_ROLES_DB_USER", "moderator_user")
@@ -274,14 +275,26 @@ class CouchConnector(BaseConnector):
         return f"http://{self.host}:{self.port}"
 
     def _auth_header(self) -> str:
-        raw = f"{self.user}:{self.password}".encode("utf-8")
+        return self._auth_header_for(self.user, self.password)
+
+    def _auth_header_for(self, user: str, password: str) -> str:
+        raw = f"{user}:{password}".encode("utf-8")
         return "Basic " + base64.b64encode(raw).decode("ascii")
 
-    def _request_json(self, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
+    def _request_json(
+        self,
+        method: str,
+        path: str,
+        payload: dict[str, Any] | None = None,
+        user: str | None = None,
+        password: str | None = None,
+    ) -> Any:
         url = f"{self._base_url()}{path}"
         body = None
         headers = {
-            "Authorization": self._auth_header(),
+            "Authorization": self._auth_header()
+            if user is None or password is None
+            else self._auth_header_for(user, password),
             "Accept": "application/json",
         }
 
@@ -410,6 +423,9 @@ class CouchConnector(BaseConnector):
         filter_query: dict[str, Any],
         sort: list[tuple[str, int]] | None = None,
     ) -> str | None:
+        if self.is_without_indexes_db:
+            return None
+
         for field_name in filter_query.keys():
             index_name = self._INDEX_BY_COLLECTION_AND_FIELD.get((collection_name, field_name))
             if index_name is not None:
@@ -600,6 +616,27 @@ class CouchConnector(BaseConnector):
             id_field = self._ID_FIELD_BY_COLLECTION.get(collection_name)
         if id_field is None:
             raise ValueError(f"No business id field configured for collection: {collection_name}")
+
+        if self.is_without_indexes_db:
+            documents = self.read_many(
+                collection_name=collection_name,
+                filter_query={},
+                projection=projection,
+                sort=None,
+                limit=None,
+            )
+            if not documents:
+                return None
+
+            def _id_value(document: dict[str, Any]) -> int:
+                value = document.get(id_field)
+                if isinstance(value, int):
+                    return value
+                if isinstance(value, str) and value.isdigit():
+                    return int(value)
+                return -1
+
+            return max(documents, key=_id_value)
 
         filter_query = {id_field: {"$gte": 0}}
         return self.read_one(

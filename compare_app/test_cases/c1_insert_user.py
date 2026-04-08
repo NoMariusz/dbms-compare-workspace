@@ -28,8 +28,8 @@ class C1InsertUserTestCase(BaseTestCase):
         connector.insert_row(
             query=(
                 "INSERT INTO users (username, email, password, phone, id_role) "
-                "VALUES (%s, %s, %s, %s, %s) "
-                "ON CONFLICT (email) DO NOTHING"
+                "SELECT %s, %s, %s, %s, %s "
+                "WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = %s)"
             ),
             params=(
                 payload["username"],
@@ -37,6 +37,7 @@ class C1InsertUserTestCase(BaseTestCase):
                 payload["password"],
                 payload["phone"],
                 payload["id_role"],
+                payload["email"],
             ),
         )
 
