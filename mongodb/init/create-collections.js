@@ -12,7 +12,11 @@ const collections = [
 	'order_items',
 ];
 
-const databasesToInitialize = ['skates_shop', 'skates_shop_without_indexes'];
+const databasesToInitialize = [
+	'skates_shop',
+	'skates_shop_without_indexes',
+	'skates_shop_roles',
+];
 
 databasesToInitialize.forEach((dbName) => {
 	const targetDb = db.getSiblingDB(dbName);

@@ -8,6 +8,10 @@ services:
             MONGO_INITDB_ROOT_USERNAME: admin
             MONGO_INITDB_ROOT_PASSWORD: password123
             MONGO_INITDB_DATABASE: skates_shop
+            MONGO_ROLES_DB_USER: moderator_user
+            MONGO_ROLES_DB_PASSWORD: moderator_password123
+            MONGO_STANDARD_DB_USER: standard_user
+            MONGO_STANDARD_DB_PASSWORD: standard_password123
         ports:
             - '27017:27017'
         volumes:

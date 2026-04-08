@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -29,15 +30,25 @@ class MongoConnector(BaseConnector):
         super().__init__(dbms_type=DBMSType.MongoDB, name=DBMSType.MongoDB.name)
         self.host = host
         self.port = port
+        self.admin_user = user
+        self.admin_password = password
         self.user = user
         self.password = password
         self.database_name = config.MONGO_DATABASE
+        self.auth_source = "admin"
+        if self.database_name == "skates_shop_roles":
+            self.user = os.getenv("MONGO_ROLES_DB_USER", "moderator_user")
+            self.password = os.getenv("MONGO_ROLES_DB_PASSWORD", "moderator_password123")
+            self.auth_source = self.database_name
         self.database = None
         self._pymongo = None
 
     def connect(self) -> None:
         self._pymongo = importlib.import_module("pymongo")
-        uri = f"mongodb://{self.user}:{self.password}@{self.host}:{self.port}/?authSource=admin"
+        uri = (
+            f"mongodb://{self.user}:{self.password}@{self.host}:{self.port}/"
+            f"?authSource={self.auth_source}"
+        )
         print(
             f"DEBUG: Connecting to {self.dbms_type.name} "
             f"at {self.host}:{self.port} to database {self.database_name}"
@@ -78,8 +89,8 @@ class MongoConnector(BaseConnector):
 
         restore_cmd = (
             "mongorestore "
-            f"--username {self.user} "
-            f"--password {self.password} "
+            f"--username {self.admin_user} "
+            f"--password {self.admin_password} "
             "--authenticationDatabase admin "
             "--drop "
             f"--nsInclude {self.database_name}.* "
