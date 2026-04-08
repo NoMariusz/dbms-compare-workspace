@@ -40,6 +40,12 @@ INDEX_DEFINITIONS = [
     {"name": "idx_order_items_id_order_id_product", "fields": ["type", "id_order", "id_product"]},
 ]
 
+ENCRYPTED_INDEX_DEFINITIONS = [
+    {"name": "idx_users_email_token", "fields": ["type", "email_token"]},
+    {"name": "idx_users_phone_token", "fields": ["type", "phone_token"]},
+    {"name": "idx_orders_shipping_address_token", "fields": ["type", "shipping_address_token"]},
+]
+
 
 def _load_env(path: Path) -> None:
     if not path.exists():
@@ -126,6 +132,14 @@ def _ensure_indexes(database_name: str) -> None:
             name=index_definition["name"],
             fields=index_definition["fields"],
         )
+
+    if database_name.endswith("_encrypted"):
+        for index_definition in ENCRYPTED_INDEX_DEFINITIONS:
+            _create_index(
+                database_name=database_name,
+                name=index_definition["name"],
+                fields=index_definition["fields"],
+            )
 
 
 def _is_without_indexes_database(database_name: str) -> bool:

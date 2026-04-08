@@ -5,6 +5,7 @@ COUCH_URL="http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb:5984"
 DB="${COUCHDB_DB}"
 DB_WITHOUT_INDEXES="${COUCHDB_DB_WITHOUT_INDEXES:-skates_shop_without_indexes}"
 DB_ROLES="${COUCHDB_DB_ROLES:-skates_shop_roles}"
+DB_ENCRYPTED="${COUCHDB_DB_ENCRYPTED:-skates_shop_encrypted}"
 
 COUCHDB_ROLES_DB_USER="${COUCHDB_ROLES_DB_USER:-moderator_user}"
 COUCHDB_ROLES_DB_PASSWORD="${COUCHDB_ROLES_DB_PASSWORD:-moderator_password123}"
@@ -19,6 +20,7 @@ done
 curl -fsS -X PUT "${COUCH_URL}/${DB}" >/dev/null 2>&1 || true
 curl -fsS -X PUT "${COUCH_URL}/${DB_WITHOUT_INDEXES}" >/dev/null 2>&1 || true
 curl -fsS -X PUT "${COUCH_URL}/${DB_ROLES}" >/dev/null 2>&1 || true
+curl -fsS -X PUT "${COUCH_URL}/${DB_ENCRYPTED}" >/dev/null 2>&1 || true
 
 create_index_for_db() {
   TARGET_DB="$1"
@@ -36,6 +38,7 @@ create_index() {
   FIELDS="$2"
 
   create_index_for_db "${DB}" "${NAME}" "${FIELDS}"
+  create_index_for_db "${DB_ENCRYPTED}" "${NAME}" "${FIELDS}"
   create_index_for_db "${DB_ROLES}" "${NAME}" "${FIELDS}"
 }
 
@@ -85,6 +88,11 @@ create_index "idx_orders_date" '["type","order_date"]'
 create_index "idx_order_items_order" '["type","id_order"]'
 create_index "idx_order_items_product" '["type","id_product"]'
 create_index "idx_order_items_order_product" '["type","id_order","id_product"]'
+
+# indexes used by connector-level deterministic lookup tokens in encrypted db
+create_index_for_db "${DB_ENCRYPTED}" "idx_users_email_token" '["type","email_token"]'
+create_index_for_db "${DB_ENCRYPTED}" "idx_users_phone_token" '["type","phone_token"]'
+create_index_for_db "${DB_ENCRYPTED}" "idx_orders_shipping_address_token" '["type","shipping_address_token"]'
 
 # --- roles db security and access control ---
 create_user_if_not_exists "${COUCHDB_ROLES_DB_USER}" "${COUCHDB_ROLES_DB_PASSWORD}" "moderators"

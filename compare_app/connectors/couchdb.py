@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
 import json
 import os
 import time
@@ -14,6 +16,13 @@ from constants import DBMSType
 
 
 class CouchConnector(BaseConnector):
+    _ENCRYPTED_DB_NAME = "skates_shop_encrypted"
+    _ENCRYPTED_PREFIX = "enc::"
+    _SENSITIVE_FIELDS_BY_COLLECTION = {
+        "users": {"email", "password", "phone"},
+        "orders": {"shipping_address"},
+    }
+
     _ID_FIELD_BY_COLLECTION = {
         "user_roles": "id_role",
         "users": "id_user",
@@ -30,6 +39,8 @@ class CouchConnector(BaseConnector):
 
     _INDEX_BY_COLLECTION_AND_FIELD = {
         ("users", "email"): "idx_users_email",
+        ("users", "email_token"): "idx_users_email_token",
+        ("users", "phone_token"): "idx_users_phone_token",
         ("users", "id_user"): "idx_users_id_user",
         ("manufacturers", "id_manufacturer"): "idx_manufacturers_id_manufacturer",
         ("manufacturers", "name"): "idx_manufacturers_name",
@@ -39,6 +50,7 @@ class CouchConnector(BaseConnector):
         ("product", "id_product"): "idx_product_id_product",
         ("product", "id_model"): "idx_product_model",
         ("orders", "id_order"): "idx_orders_id_order",
+        ("orders", "shipping_address_token"): "idx_orders_shipping_address_token",
         ("orders", "id_user"): "idx_orders_user_date",
         ("order_items", "id_order_item"): "idx_order_items_id_order_item",
         ("order_items", "id_order"): "idx_order_items_order",
@@ -59,6 +71,8 @@ class CouchConnector(BaseConnector):
         self.user = user
         self.password = password
         self.database_name = config.COUCHDB_DATABASE
+        self.is_encrypted_db = self.database_name == self._ENCRYPTED_DB_NAME
+        self._encryption_key = self._build_encryption_key()
         if self.database_name == "skates_shop_roles":
             self.user = os.getenv("COUCHDB_ROLES_DB_USER", "moderator_user")
             self.password = os.getenv("COUCHDB_ROLES_DB_PASSWORD", "moderator_password123")
@@ -74,6 +88,119 @@ class CouchConnector(BaseConnector):
 
     def close(self) -> None:
         self.client = None
+
+    def _build_encryption_key(self) -> bytes:
+        configured = os.getenv("COUCHDB_ENCRYPTION_KEY")
+        if configured:
+            return hashlib.sha256(configured.encode("utf-8")).digest()
+
+        base_material = f"{self.admin_password}:{self.database_name}"
+        return hashlib.sha256(base_material.encode("utf-8")).digest()
+
+    def _is_sensitive_field(self, collection_name: str, field_name: str) -> bool:
+        return field_name in self._SENSITIVE_FIELDS_BY_COLLECTION.get(collection_name, set())
+
+    def _token_field_name(self, field_name: str) -> str:
+        return f"{field_name}_token"
+
+    def _make_token(self, value: Any) -> str:
+        normalized = str(value).encode("utf-8")
+        digest = hmac.new(self._encryption_key, normalized, hashlib.sha256).hexdigest()
+        return digest
+
+    def _encrypt_string(self, value: str) -> str:
+        if value.startswith(self._ENCRYPTED_PREFIX):
+            return value
+
+        value_bytes = value.encode("utf-8")
+        encrypted_bytes = bytes(
+            byte ^ self._encryption_key[index % len(self._encryption_key)]
+            for index, byte in enumerate(value_bytes)
+        )
+        encoded = base64.urlsafe_b64encode(encrypted_bytes).decode("ascii")
+        return f"{self._ENCRYPTED_PREFIX}{encoded}"
+
+    def _decrypt_string(self, value: str) -> str:
+        if not value.startswith(self._ENCRYPTED_PREFIX):
+            return value
+
+        encoded = value[len(self._ENCRYPTED_PREFIX):]
+        encrypted_bytes = base64.urlsafe_b64decode(encoded.encode("ascii"))
+        decrypted_bytes = bytes(
+            byte ^ self._encryption_key[index % len(self._encryption_key)]
+            for index, byte in enumerate(encrypted_bytes)
+        )
+        return decrypted_bytes.decode("utf-8")
+
+    def _transform_document_for_storage(self, collection_name: str, document: dict[str, Any]) -> dict[str, Any]:
+        if not self.is_encrypted_db:
+            return dict(document)
+
+        transformed = dict(document)
+        for field_name in self._SENSITIVE_FIELDS_BY_COLLECTION.get(collection_name, set()):
+            value = transformed.get(field_name)
+            if value is None:
+                continue
+            if not isinstance(value, str):
+                value = str(value)
+            plaintext_value = self._decrypt_string(value)
+            transformed[field_name] = self._encrypt_string(plaintext_value)
+            transformed[self._token_field_name(field_name)] = self._make_token(plaintext_value)
+
+        return transformed
+
+    def _transform_filter_for_storage(self, collection_name: str, filter_query: dict[str, Any]) -> dict[str, Any]:
+        if not self.is_encrypted_db:
+            return dict(filter_query)
+
+        transformed: dict[str, Any] = {}
+        for field_name, value in filter_query.items():
+            if not self._is_sensitive_field(collection_name, field_name):
+                transformed[field_name] = value
+                continue
+
+            token_field = self._token_field_name(field_name)
+            if isinstance(value, dict):
+                if "$eq" in value and value["$eq"] is not None:
+                    transformed[token_field] = self._make_token(value["$eq"])
+                else:
+                    transformed[field_name] = value
+                continue
+
+            transformed[token_field] = self._make_token(value)
+
+        return transformed
+
+    def _transform_document_for_read(self, collection_name: str, document: dict[str, Any]) -> dict[str, Any]:
+        transformed = dict(document)
+        if not self.is_encrypted_db:
+            return transformed
+
+        for field_name in self._SENSITIVE_FIELDS_BY_COLLECTION.get(collection_name, set()):
+            value = transformed.get(field_name)
+            if isinstance(value, str):
+                transformed[field_name] = self._decrypt_string(value)
+            transformed.pop(self._token_field_name(field_name), None)
+
+        return transformed
+
+    def _apply_encryption_to_existing_documents(self) -> None:
+        if not self.is_encrypted_db:
+            return
+
+        for collection_name in self._SENSITIVE_FIELDS_BY_COLLECTION.keys():
+            documents = self._find_docs(selector={"type": collection_name}, limit=1_000_000)
+            if not documents:
+                continue
+
+            changed_docs: list[dict[str, Any]] = []
+            for document in documents:
+                transformed = self._transform_document_for_storage(collection_name, document)
+                if transformed != document:
+                    changed_docs.append(transformed)
+
+            if changed_docs:
+                self._bulk_docs(changed_docs, chunk_size=500)
         
     def _ensure_runtime_indexes(self) -> None:
         runtime_indexes = [
@@ -113,6 +240,7 @@ class CouchConnector(BaseConnector):
         self._delete_database_if_exists()
         self._create_database()
         self._restore_documents(documents)
+        self._apply_encryption_to_existing_documents()
         self._restore_indexes(indexes)
         self._ensure_runtime_indexes()
 
@@ -355,7 +483,7 @@ class CouchConnector(BaseConnector):
         if prepared.get("_id") is None and id_field and prepared.get(id_field) is not None:
             prepared["_id"] = f"{collection_name}:{prepared[id_field]}"
 
-        return prepared
+        return self._transform_document_for_storage(collection_name, prepared)
 
     def _save_document(self, document: dict[str, Any]) -> Any:
         prepared = dict(document)
@@ -417,10 +545,11 @@ class CouchConnector(BaseConnector):
         projection: dict[str, int] | None = None,
         sort: list[tuple[str, int]] | None = None,
     ) -> dict[str, Any] | None:
-        selector = self._with_collection_type(collection_name, filter_query)
+        transformed_filter = self._transform_filter_for_storage(collection_name, filter_query)
+        selector = self._with_collection_type(collection_name, transformed_filter)
         fields = self._projection_to_fields(projection)
         mango_sort = self._sort_to_mango(sort)
-        use_index = self._choose_index_name(collection_name, filter_query, sort)
+        use_index = self._choose_index_name(collection_name, transformed_filter, sort)
 
         documents = self._find_docs(
             selector=selector,
@@ -432,7 +561,8 @@ class CouchConnector(BaseConnector):
         if not documents:
             return None
 
-        return self._normalize_document(documents[0])
+        normalized = self._normalize_document(documents[0])
+        return self._transform_document_for_read(collection_name, normalized)
 
     def read_many(
         self,
@@ -442,10 +572,11 @@ class CouchConnector(BaseConnector):
         sort: list[tuple[str, int]] | None = None,
         limit: int | None = None,
     ) -> list[dict[str, Any]]:
-        selector = self._with_collection_type(collection_name, filter_query)
+        transformed_filter = self._transform_filter_for_storage(collection_name, filter_query)
+        selector = self._with_collection_type(collection_name, transformed_filter)
         fields = self._projection_to_fields(projection)
         mango_sort = self._sort_to_mango(sort)
-        use_index = self._choose_index_name(collection_name, filter_query, sort)
+        use_index = self._choose_index_name(collection_name, transformed_filter, sort)
 
         documents = self._find_docs(
             selector=selector,
@@ -454,7 +585,10 @@ class CouchConnector(BaseConnector):
             limit=limit if limit is not None else 1_000_000,
             use_index=use_index,
         )
-        return [self._normalize_document(document) for document in documents]
+        return [
+            self._transform_document_for_read(collection_name, self._normalize_document(document))
+            for document in documents
+        ]
 
     def read_latest(
         self,
@@ -498,21 +632,35 @@ class CouchConnector(BaseConnector):
         upsert: bool = False,
         limit: int | None = None,
     ) -> int:
-        selector = self._with_collection_type(collection_name, filter_query)
+        transformed_filter = self._transform_filter_for_storage(collection_name, filter_query)
+        selector = self._with_collection_type(collection_name, transformed_filter)
         documents = self._find_docs(
             selector=selector,
             limit=limit if limit is not None else 1_000_000,
-            use_index=self._choose_index_name(collection_name, filter_query),
+            use_index=self._choose_index_name(collection_name, transformed_filter),
         )
 
-        set_payload = update_query.get("$set", {})
+        set_payload = dict(update_query.get("$set", {}))
         inc_payload = update_query.get("$inc", {})
+        if self.is_encrypted_db:
+            for field_name in self._SENSITIVE_FIELDS_BY_COLLECTION.get(collection_name, set()):
+                if field_name in set_payload:
+                    raw_value = set_payload[field_name]
+                    if raw_value is None:
+                        set_payload.pop(field_name)
+                        set_payload.pop(self._token_field_name(field_name), None)
+                        continue
+                    if not isinstance(raw_value, str):
+                        raw_value = str(raw_value)
+                    set_payload[field_name] = self._encrypt_string(raw_value)
+                    set_payload[self._token_field_name(field_name)] = self._make_token(raw_value)
+
 
         if not isinstance(set_payload, dict) or not isinstance(inc_payload, dict):
             raise ValueError("CouchConnector.update_many supports only '$set' and '$inc' operators.")
 
         if not documents and upsert:
-            new_document = {**filter_query}
+            new_document = {**transformed_filter}
             for key, value in set_payload.items():
                 new_document[key] = value
             for key, value in inc_payload.items():
@@ -551,12 +699,13 @@ class CouchConnector(BaseConnector):
         filter_query: dict[str, Any],
         limit: int | None = None,
     ) -> int:
-        selector = self._with_collection_type(collection_name, filter_query)
+        transformed_filter = self._transform_filter_for_storage(collection_name, filter_query)
+        selector = self._with_collection_type(collection_name, transformed_filter)
         documents = self._find_docs(
             selector=selector,
             fields=["_id", "_rev"],
             limit=limit if limit is not None else 1_000_000,
-            use_index=self._choose_index_name(collection_name, filter_query),
+            use_index=self._choose_index_name(collection_name, transformed_filter),
         )
         if not documents:
             return 0
