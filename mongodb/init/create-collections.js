@@ -14,6 +14,7 @@ const collections = [
 
 const databasesToInitialize = [
 	'skates_shop',
+	'skates_shop_encrypted',
 	'skates_shop_without_indexes',
 	'skates_shop_roles',
 ];

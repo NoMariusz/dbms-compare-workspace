@@ -1,4 +1,8 @@
-const databasesWithIndexes = ['skates_shop', 'skates_shop_roles'];
+const databasesWithIndexes = [
+	'skates_shop',
+	'skates_shop_encrypted',
+	'skates_shop_roles',
+];
 
 function applyIndexes(targetDb) {
 	// --- primary/business ids ---

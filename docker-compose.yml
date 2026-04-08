@@ -24,6 +24,25 @@ services:
             timeout: 5s
             retries: 5
 
+    mongodb-qe-init:
+        image: python:3.12-slim
+        depends_on:
+            mongodb:
+                condition: service_healthy
+        working_dir: /workspace/compare_app
+        environment:
+            MONGO_HOST: mongodb
+            MONGO_PORT: 27017
+            MONGO_USERNAME: admin
+            MONGO_PASSWORD: password123
+            MONGO_QE_MASTER_KEY_PATH: /workspace/compare_app/.mongo_qe_master_key.bin
+        volumes:
+            - ./:/workspace
+        command:
+            - /bin/sh
+            - -lc
+            - pip install --no-cache-dir pymongo>=4.10.1 pymongocrypt>=1.11.0 ; python util_scripts/setup_mongodb_queryable_encryption.py --db skates_shop_encrypted
+
     couchdb:
         build: ./couchdb
         container_name: couchdb_lts
