@@ -108,6 +108,33 @@ def _ensure_indexes(db) -> None:
     db.order_items.create_index([("id_order", asc), ("id_product", asc)])
 
 
+def _is_without_indexes_database(db_name: str) -> bool:
+    return db_name.endswith("_without_indexes")
+
+
+def _has_non_default_indexes(db) -> bool:
+    collections = [
+        "user_roles",
+        "users",
+        "manufacturers",
+        "product_types",
+        "models",
+        "models_to_product_types",
+        "gear_specifications",
+        "product",
+        "order_status",
+        "orders",
+        "order_items",
+    ]
+    for collection_name in collections:
+        if collection_name not in db.list_collection_names():
+            continue
+        index_names = db[collection_name].index_information().keys()
+        if any(index_name != "_id_" for index_name in index_names):
+            return True
+    return False
+
+
 def _ensure_reference_data(db) -> None:
     db.user_roles.replace_one(
         {"id_role": 1},
@@ -222,14 +249,22 @@ def _insert_many(collection, documents: list[dict], batch_size: int) -> None:
         collection.insert_many(documents[start:end], ordered=False)
 
 
-def populate_database(size: int, batch_size: int, reset: bool) -> None:
+def populate_database(size: int, batch_size: int, reset: bool, db_name: str | None = None) -> None:
     client = _connect()
     try:
-        db_name = _env("MONGO_DATABASE", "skates_shop")
-        db = client[db_name]
+        selected_db_name = db_name or _env("MONGO_DATABASE", "skates_shop")
+        db = client[selected_db_name]
 
         _ensure_collections(db)
-        _ensure_indexes(db)
+        if _is_without_indexes_database(selected_db_name):
+            print(f"Skipping index creation for non-indexed database: {selected_db_name}")
+        else:
+            _ensure_indexes(db)
+
+        if _has_non_default_indexes(db):
+            print(f"Database {selected_db_name} has secondary indexes")
+        else:
+            print(f"Database {selected_db_name} has no secondary indexes (only default _id index)")
 
         if reset:
             _truncate_generated_collections(db)
@@ -376,6 +411,7 @@ def populate_database(size: int, batch_size: int, reset: bool) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate random MongoDB data for benchmark tests")
+    parser.add_argument("--db", type=str, default=None, help="target MongoDB database name")
     parser.add_argument("--size", type=int, required=True, help="total generated row budget split across entities")
     parser.add_argument("--batch-size", type=int, default=1000, help="batch size for insert operations")
     parser.add_argument("--seed", type=int, default=None, help="optional random seed")
@@ -385,7 +421,10 @@ def parse_args() -> argparse.Namespace:
 
 """
 Populate db:
-py util_scripts\generate_random_data_mongodb.py --size 500000 --batch-size 1000 --reset
+py util_scripts\\generate_random_data_mongodb.py --db skates_shop --size 500000 --batch-size 1000 --reset
+
+Populate non-indexed db:
+py util_scripts\\generate_random_data_mongodb.py --db skates_shop_without_indexes --size 500000 --batch-size 1000 --reset
 
 Create backup inside mongodb_lts container:
 docker exec mongodb_lts sh -lc 'mongodump --uri "mongodb://admin:password123@localhost:27017/skates_shop?authSource=admin" --archive=/tmp/mongodb_500k.archive'
@@ -416,8 +455,10 @@ def main() -> None:
         size=args.size,
         batch_size=args.batch_size,
         reset=args.reset,
+        db_name=args.db,
     )
-    print(f"MongoDB data generation finished for size={args.size}")
+    target_db = args.db or _env("MONGO_DATABASE", "skates_shop")
+    print(f"MongoDB data generation finished for db={target_db}, size={args.size}")
 
 
 if __name__ == "__main__":

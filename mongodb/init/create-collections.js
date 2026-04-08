@@ -1,23 +1,26 @@
-db = db.getSiblingDB('skates_shop');
-
 const collections = [
-  'user_roles',
-  'users',
-  'manufacturers',
-  'product_types',
-  'models',
-  'models_to_product_types',
-  'gear_specifications',
-  'product',
-  'order_status',
-  'orders',
-  'order_items',
+	'user_roles',
+	'users',
+	'manufacturers',
+	'product_types',
+	'models',
+	'models_to_product_types',
+	'gear_specifications',
+	'product',
+	'order_status',
+	'orders',
+	'order_items',
 ];
 
-const existing = db.getCollectionNames();
+const databasesToInitialize = ['skates_shop', 'skates_shop_without_indexes'];
 
-collections.forEach((name) => {
-  if (!existing.includes(name)) {
-    db.createCollection(name);
-  }
+databasesToInitialize.forEach((dbName) => {
+	const targetDb = db.getSiblingDB(dbName);
+	const existing = targetDb.getCollectionNames();
+
+	collections.forEach((name) => {
+		if (!existing.includes(name)) {
+			targetDb.createCollection(name);
+		}
+	});
 });

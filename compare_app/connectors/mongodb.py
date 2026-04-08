@@ -99,7 +99,7 @@ class MongoConnector(BaseConnector):
         return "mongodb_lts"
 
     def _resolve_backup_path(self, size_label: str) -> Path:
-        return Path(f"./data/db_backups/mongodb_{size_label}.archive")
+        return Path(f"./data/db_backups/{self.database_name}/mongodb_{size_label}.archive")
 
     def _get_collection(self, collection_name: str):
         if self.database is None:

@@ -134,7 +134,7 @@ class CouchConnector(BaseConnector):
         raise RuntimeError("CouchDB did not become query-ready after restore within the expected time.")
 
     def _resolve_backup_path(self, size_label: str) -> Path:
-        return Path(f"./data/db_backups/couchdb_{size_label}.json")
+        return Path(f"./data/db_backups/{self.database_name}/couchdb_{size_label}.json")
 
     def _base_url(self) -> str:
         return f"http://{self.host}:{self.port}"

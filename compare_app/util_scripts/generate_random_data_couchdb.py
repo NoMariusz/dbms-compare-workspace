@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any
 from urllib import error, request
 
-
 INDEX_DEFINITIONS = [
     {"name": "idx_user_roles_id_role", "fields": ["type", "id_role"]},
     {"name": "idx_users_id_user", "fields": ["type", "id_user"]},
@@ -127,6 +126,19 @@ def _ensure_indexes(database_name: str) -> None:
             name=index_definition["name"],
             fields=index_definition["fields"],
         )
+
+
+def _is_without_indexes_database(database_name: str) -> bool:
+    return database_name.endswith("_without_indexes")
+
+
+def _has_secondary_indexes(database_name: str) -> bool:
+    result = _request_json(method="GET", path=f"/{database_name}/_index")
+    indexes = result.get("indexes", [])
+    for index_item in indexes:
+        if index_item.get("type") != "special":
+            return True
+    return False
 
 
 def _chunks(items: list[dict[str, Any]], chunk_size: int):
@@ -294,22 +306,44 @@ def _build_backup_payload(database_name: str) -> dict[str, Any]:
     )
 
     documents = all_docs_result.get("docs", [])
+    existing_indexes_result = _request_json(method="GET", path=f"/{database_name}/_index")
+    existing_indexes = []
+    for index_item in existing_indexes_result.get("indexes", []):
+        if index_item.get("type") == "special":
+            continue
+        definition = index_item.get("def", {}).get("fields", [])
+        fields = [field for item in definition for field in item.keys()]
+        existing_indexes.append(
+            {
+                "name": index_item.get("name"),
+                "fields": fields,
+            }
+        )
+
     return {
         "documents": documents,
-        "indexes": INDEX_DEFINITIONS,
+        "indexes": existing_indexes,
     }
 
 
-def populate_database(size: int, batch_size: int, reset: bool) -> None:
-    database_name = _env("COUCHDB_DB", "skates_shop")
+def populate_database(size: int, batch_size: int, reset: bool, database_name: str | None = None) -> None:
+    selected_database_name = database_name or _env("COUCHDB_DB", "skates_shop")
 
-    _ensure_database_exists(database_name)
-    _ensure_indexes(database_name)
+    _ensure_database_exists(selected_database_name)
+    if _is_without_indexes_database(selected_database_name):
+        print(f"Skipping index creation for non-indexed database: {selected_database_name}")
+    else:
+        _ensure_indexes(selected_database_name)
+
+    if _has_secondary_indexes(selected_database_name):
+        print(f"Database {selected_database_name} has secondary indexes")
+    else:
+        print(f"Database {selected_database_name} has no secondary indexes")
 
     if reset:
-        _truncate_generated_documents(database_name)
+        _truncate_generated_documents(selected_database_name)
 
-    _ensure_reference_data(database_name)
+    _ensure_reference_data(selected_database_name)
 
     sizes = _split_entity_sizes(size)
     run_tag = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -341,7 +375,7 @@ def populate_database(size: int, batch_size: int, reset: bool) -> None:
                 "name": f"Manufacturer {run_tag}-{manufacturer_id}",
             }
         )
-    _bulk_docs(database_name, manufacturer_docs, chunk_size=batch_size)
+    _bulk_docs(selected_database_name, manufacturer_docs, chunk_size=batch_size)
 
     model_docs: list[dict[str, Any]] = []
     for model_id in model_ids:
@@ -357,7 +391,7 @@ def populate_database(size: int, batch_size: int, reset: bool) -> None:
                 "release_date": datetime.combine(release_date, time.min).isoformat(),
             }
         )
-    _bulk_docs(database_name, model_docs, chunk_size=batch_size)
+    _bulk_docs(selected_database_name, model_docs, chunk_size=batch_size)
 
     mapping_docs: list[dict[str, Any]] = []
     if model_ids and product_type_ids and mappings_count > 0:
@@ -378,7 +412,7 @@ def populate_database(size: int, batch_size: int, reset: bool) -> None:
                     "id_type": pair[1],
                 }
             )
-    _bulk_docs(database_name, mapping_docs, chunk_size=batch_size)
+    _bulk_docs(selected_database_name, mapping_docs, chunk_size=batch_size)
 
     specification_docs: list[dict[str, Any]] = []
     for specification_id in specification_ids:
@@ -394,7 +428,7 @@ def populate_database(size: int, batch_size: int, reset: bool) -> None:
                 "bearing_type": random.choice(["ABEC-5", "ABEC-7", "ILQ-9"]),
             }
         )
-    _bulk_docs(database_name, specification_docs, chunk_size=batch_size)
+    _bulk_docs(selected_database_name, specification_docs, chunk_size=batch_size)
 
     product_docs: list[dict[str, Any]] = []
     for product_id in product_ids:
@@ -412,7 +446,7 @@ def populate_database(size: int, batch_size: int, reset: bool) -> None:
                 "description": f"Generated product {run_tag}-{product_id}",
             }
         )
-    _bulk_docs(database_name, product_docs, chunk_size=batch_size)
+    _bulk_docs(selected_database_name, product_docs, chunk_size=batch_size)
 
     user_docs: list[dict[str, Any]] = []
     for user_id in user_ids:
@@ -428,7 +462,7 @@ def populate_database(size: int, batch_size: int, reset: bool) -> None:
                 "id_role": random.choice([1, 2]),
             }
         )
-    _bulk_docs(database_name, user_docs, chunk_size=batch_size)
+    _bulk_docs(selected_database_name, user_docs, chunk_size=batch_size)
 
     order_docs: list[dict[str, Any]] = []
     for order_id in order_ids:
@@ -444,7 +478,7 @@ def populate_database(size: int, batch_size: int, reset: bool) -> None:
                 "shipping_address": f"{run_tag}-addr-{order_id}",
             }
         )
-    _bulk_docs(database_name, order_docs, chunk_size=batch_size)
+    _bulk_docs(selected_database_name, order_docs, chunk_size=batch_size)
 
     order_item_docs: list[dict[str, Any]] = []
     for order_item_id in range(1, order_items_count + 1):
@@ -459,15 +493,15 @@ def populate_database(size: int, batch_size: int, reset: bool) -> None:
                 "unit_price": round(random.uniform(40.0, 1000.0), 2),
             }
         )
-    _bulk_docs(database_name, order_item_docs, chunk_size=batch_size)
+    _bulk_docs(selected_database_name, order_item_docs, chunk_size=batch_size)
 
 
-def export_backup(size_label: str, output_dir: Path) -> Path:
-    database_name = _env("COUCHDB_DB", "skates_shop")
+def export_backup(size_label: str, output_dir: Path, database_name: str | None = None) -> Path:
+    selected_database_name = database_name or _env("COUCHDB_DB", "skates_shop")
     output_dir.mkdir(parents=True, exist_ok=True)
-    backup_path = output_dir / f"couchdb_{size_label}.json"
+    backup_path = output_dir / f"couchdb_{selected_database_name}_{size_label}.json"
 
-    payload = _build_backup_payload(database_name)
+    payload = _build_backup_payload(selected_database_name)
     with backup_path.open("w", encoding="utf-8") as backup_file:
         json.dump(payload, backup_file, ensure_ascii=False)
 
@@ -476,6 +510,7 @@ def export_backup(size_label: str, output_dir: Path) -> Path:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate random CouchDB data for benchmark tests")
+    parser.add_argument("--db", type=str, default=None, help="target CouchDB database name")
     parser.add_argument("--size", type=int, required=True, help="total generated row budget split across entities")
     parser.add_argument("--size-label", type=str, required=True, help="dataset label, e.g. 500k / 1m / 10m")
     parser.add_argument("--batch-size", type=int, default=1000, help="batch size for bulk document operations")
@@ -492,16 +527,19 @@ def parse_args() -> argparse.Namespace:
 
 """
 Populate db and export backup:
-py util_scripts\generate_random_data_couchdb.py --size 500000 --size-label 500k --batch-size 1000 --reset
+py util_scripts/generate_random_data_couchdb.py --db skates_shop --size 500000 --size-label 500k --batch-size 1000 --reset
+
+Populate non-indexed db and export backup:
+py util_scripts/generate_random_data_couchdb.py --db skates_shop_without_indexes --size 500000 --size-label 500k --batch-size 1000 --reset
 
 Similarly for:
 --size 1000000 --size-label 1m
 --size 10000000 --size-label 10m
 
 It creates:
-./data/db_backups/couchdb_500k.json
-./data/db_backups/couchdb_1m.json
-./data/db_backups/couchdb_10m.json
+./data/db_backups/couchdb_skates_shop_500k.json
+./data/db_backups/couchdb_skates_shop_1m.json
+./data/db_backups/couchdb_skates_shop_10m.json
 """
 
 
@@ -522,12 +560,15 @@ def main() -> None:
         size=args.size,
         batch_size=args.batch_size,
         reset=args.reset,
+        database_name=args.db,
     )
     backup_path = export_backup(
         size_label=args.size_label,
         output_dir=Path(args.output_dir),
+        database_name=args.db,
     )
-    print(f"CouchDB data generation finished for size={args.size}")
+    target_db = args.db or _env("COUCHDB_DB", "skates_shop")
+    print(f"CouchDB data generation finished for db={target_db}, size={args.size}")
     print(f"Backup exported to: {backup_path}")
 
 

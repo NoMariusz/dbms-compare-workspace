@@ -3,13 +3,15 @@ set -eu
 
 COUCH_URL="http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb:5984"
 DB="${COUCHDB_DB}"
+DB_WITHOUT_INDEXES="${COUCHDB_DB_WITHOUT_INDEXES:-skates_shop_without_indexes}"
 
 until curl -fsS "${COUCH_URL}/" >/dev/null; do
   sleep 2
 done
 
-# Create business database if it does not exist
+# Create business databases if they do not exist
 curl -fsS -X PUT "${COUCH_URL}/${DB}" >/dev/null 2>&1 || true
+curl -fsS -X PUT "${COUCH_URL}/${DB_WITHOUT_INDEXES}" >/dev/null 2>&1 || true
 
 create_index() {
   NAME="$1"
