@@ -3,13 +3,13 @@ import argparse
 from constants import DBDataSize, DBMSType
 
 # Default values
-_DEFAULT_POSTGRES_LTS_DB = 'main_db'
-_DEFAULT_POSTGRES_11_DB = 'main_db'
+_DEFAULT_POSTGRES_LTS_DB = 'indexed_db'
+_DEFAULT_POSTGRES_11_DB = 'indexed_db'
 _DEFAULT_MONGO_DATABASE = 'skates_shop'
 _DEFAULT_COUCHDB_DATABASE = 'skates_shop'
 _DEFAULT_OUTPUT_FILE_PATH = './data/results/base_results.csv'
 _DEFAULT_TESTED_SIZES = [DBDataSize.SMALL, DBDataSize.MEDIUM, DBDataSize.LARGE]
-_DEFAULT_TESTED_DBMS = [DBMSType.PostgreSQL_LTS, DBMSType.PostgreSQL_11]
+_DEFAULT_TESTED_DBMS = [DBMSType.PostgreSQL_LTS, DBMSType.PostgreSQL_11, DBMSType.MongoDB, DBMSType.CouchDB]
 _DEFAULT_NUMBER_OF_TEST_RUNS = 3
 _DEFAULT_TEST_CASES: list[str] | None = None
 
