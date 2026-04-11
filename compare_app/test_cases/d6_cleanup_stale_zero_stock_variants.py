@@ -4,7 +4,6 @@ from connectors.couchdb import CouchConnector
 from connectors.mongodb import MongoConnector
 from connectors.postgres import PostgresConnector
 from test_cases.base import BaseTestCase
-from datetime import datetime, timedelta
 
 
 class D6CleanupStaleZeroStockVariantsTestCase(BaseTestCase):
