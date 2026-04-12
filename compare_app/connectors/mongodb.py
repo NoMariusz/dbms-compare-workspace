@@ -45,9 +45,18 @@ class MongoConnector(BaseConnector):
 
     def connect(self) -> None:
         self._pymongo = importlib.import_module("pymongo")
+        query_params = [f"authSource={self.auth_source}"]
+        replica_set = os.getenv("MONGO_REPLICA_SET", "rs0").strip()
+        if replica_set:
+            query_params.append(f"replicaSet={replica_set}")
+
+        direct_connection = os.getenv("MONGO_DIRECT_CONNECTION", "true").strip().lower()
+        if direct_connection in {"1", "true", "yes", "on"}:
+            query_params.append("directConnection=true")
+
         uri = (
             f"mongodb://{self.user}:{self.password}@{self.host}:{self.port}/"
-            f"?authSource={self.auth_source}"
+            f"?{'&'.join(query_params)}"
         )
         print(
             f"DEBUG: Connecting to {self.dbms_type.name} "

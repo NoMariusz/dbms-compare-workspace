@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 
 # DB_NAMES = ["skates_shop", "skates_shop_without_indexes", "skates_shop_roles", "skates_shop_encrypted"]
-DB_NAMES = ["skates_shop_without_indexes", "skates_shop_roles", "skates_shop_encrypted"]
+DB_NAMES = ["skates_shop_encrypted"]
 # SIZES = [500_000, 1_000_000, 10_000_000]
 SIZES = [500_000]
 # SIZE_NAMES = ["500k", "1m", "10m"]
@@ -12,7 +12,10 @@ SIZE_NAMES = [ "500k"]
 
 BATCH_SIZE = 5000
 MONGO_CONTAINER = "mongodb_lts"
-MONGO_URI_TEMPLATE = "mongodb://admin:password123@localhost:27017/{db_name}?authSource=admin"
+MONGO_URI_TEMPLATE = (
+    "mongodb://admin:password123@localhost:27017/{db_name}"
+    "?authSource=admin&replicaSet=rs0&directConnection=true"
+)
 
 
 def _run_command(command: list[str], step_name: str) -> None:
@@ -103,7 +106,7 @@ def main() -> None:
             print(f"Starting: db={db_name}, size={size} ({size_name})")
 
             _generate_mongodb_backup(db_name=db_name, size=size, size_name=size_name, db_dir=db_dir)
-            _generate_couchdb_backup(db_name=db_name, size=size, size_name=size_name, db_dir=db_dir)
+            # _generate_couchdb_backup(db_name=db_name, size=size, size_name=size_name, db_dir=db_dir)
 
             print("<" * 68)
 

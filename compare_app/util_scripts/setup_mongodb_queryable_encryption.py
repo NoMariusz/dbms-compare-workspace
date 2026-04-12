@@ -32,11 +32,20 @@ def _env(name: str, default: str | None = None) -> str:
 
 
 def _connect_admin() -> pymongo.MongoClient:
+    query_params = ["authSource=admin"]
+    replica_set = _env("MONGO_REPLICA_SET", "rs0").strip()
+    if replica_set:
+        query_params.append(f"replicaSet={replica_set}")
+
+    direct_connection = _env("MONGO_DIRECT_CONNECTION", "true").strip().lower()
+    if direct_connection in {"1", "true", "yes", "on"}:
+        query_params.append("directConnection=true")
+
     uri = (
         f"mongodb://{_env('MONGO_USERNAME', 'admin')}:"
         f"{_env('MONGO_PASSWORD', 'password123')}@"
         f"{_env('MONGO_HOST', 'localhost')}:"
-        f"{_env('MONGO_PORT', '27017')}/?authSource=admin"
+        f"{_env('MONGO_PORT', '27017')}/?{'&'.join(query_params)}"
     )
     client = pymongo.MongoClient(uri)
     client.admin.command("ping")
@@ -164,10 +173,26 @@ def setup_queryable_encryption(database_name: str, recreate_collections: bool) -
             codec_options=codec_options,
         )
         try:
-            data_key_id = _get_or_create_data_key(
+            # Create separate data keys for each encrypted field to avoid "Duplicate key ids" error
+            email_key_id = _get_or_create_data_key(
                 client_encryption=client_encryption,
                 key_vault_collection=key_vault_collection,
-                key_alt_name=_env("MONGO_QE_DATA_KEY_ALT_NAME", "skates_shop_encrypted_data_key"),
+                key_alt_name=_env("MONGO_QE_EMAIL_KEY_ALT_NAME", "skates_shop_email_key"),
+            )
+            password_key_id = _get_or_create_data_key(
+                client_encryption=client_encryption,
+                key_vault_collection=key_vault_collection,
+                key_alt_name=_env("MONGO_QE_PASSWORD_KEY_ALT_NAME", "skates_shop_password_key"),
+            )
+            phone_key_id = _get_or_create_data_key(
+                client_encryption=client_encryption,
+                key_vault_collection=key_vault_collection,
+                key_alt_name=_env("MONGO_QE_PHONE_KEY_ALT_NAME", "skates_shop_phone_key"),
+            )
+            shipping_address_key_id = _get_or_create_data_key(
+                client_encryption=client_encryption,
+                key_vault_collection=key_vault_collection,
+                key_alt_name=_env("MONGO_QE_SHIPPING_ADDRESS_KEY_ALT_NAME", "skates_shop_shipping_address_key"),
             )
 
             users_encrypted_fields = {
@@ -175,19 +200,19 @@ def setup_queryable_encryption(database_name: str, recreate_collections: bool) -
                     {
                         "path": "email",
                         "bsonType": "string",
-                        "keyId": data_key_id,
+                        "keyId": email_key_id,
                         "queries": {"queryType": "equality"},
                     },
                     {
                         "path": "password",
                         "bsonType": "string",
-                        "keyId": data_key_id,
+                        "keyId": password_key_id,
                         "queries": {"queryType": "equality"},
                     },
                     {
                         "path": "phone",
                         "bsonType": "string",
-                        "keyId": data_key_id,
+                        "keyId": phone_key_id,
                         "queries": {"queryType": "equality"},
                     },
                 ]
@@ -197,12 +222,13 @@ def setup_queryable_encryption(database_name: str, recreate_collections: bool) -
                     {
                         "path": "shipping_address",
                         "bsonType": "string",
-                        "keyId": data_key_id,
+                        "keyId": shipping_address_key_id,
                         "queries": {"queryType": "equality"},
                     }
                 ]
             }
 
+            print(f"Creating encrypted collection 'users' with fields: {[f['path'] for f in users_encrypted_fields['fields']]}")
             _create_or_replace_encrypted_collection(
                 client_encryption=client_encryption,
                 target_db=target_db,
@@ -210,6 +236,7 @@ def setup_queryable_encryption(database_name: str, recreate_collections: bool) -
                 encrypted_fields=users_encrypted_fields,
                 recreate=recreate_collections,
             )
+            print(f"Creating encrypted collection 'orders' with fields: {[f['path'] for f in orders_encrypted_fields['fields']]}")
             _create_or_replace_encrypted_collection(
                 client_encryption=client_encryption,
                 target_db=target_db,
@@ -217,11 +244,11 @@ def setup_queryable_encryption(database_name: str, recreate_collections: bool) -
                 encrypted_fields=orders_encrypted_fields,
                 recreate=recreate_collections,
             )
+
+            print(f"Queryable Encryption setup finished for database: {database_name}")
+            print(f"Local master key path: {master_key_path}")
         finally:
             client_encryption.close()
-
-        print(f"Queryable Encryption setup finished for database: {database_name}")
-        print(f"Local master key path: {master_key_path}")
     finally:
         client.close()
 

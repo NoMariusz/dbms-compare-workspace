@@ -7,6 +7,9 @@ from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
 import pymongo
+from bson import UuidRepresentation
+from bson.codec_options import CodecOptions
+from pymongo.encryption import Algorithm, ClientEncryption
 
 
 def _load_env(path: Path) -> None:
@@ -30,15 +33,41 @@ def _env(name: str, default: str | None = None) -> str:
 
 
 def _connect():
-    uri = (
-        f"mongodb://{_env('MONGO_USERNAME', 'admin')}:"
-        f"{_env('MONGO_PASSWORD', 'password123')}@"
-        f"{_env('MONGO_HOST', 'localhost')}:"
-        f"{_env('MONGO_PORT', '27017')}/?authSource=admin"
-    )
+    uri = _build_mongo_uri()
     client = pymongo.MongoClient(uri)
     client.admin.command("ping")
     return client
+
+
+def _build_mongo_uri() -> str:
+    query_params = ["authSource=admin"]
+    replica_set = _env("MONGO_REPLICA_SET", "rs0").strip()
+    if replica_set:
+        query_params.append(f"replicaSet={replica_set}")
+
+    direct_connection = _env("MONGO_DIRECT_CONNECTION", "true").strip().lower()
+    if direct_connection in {"1", "true", "yes", "on"}:
+        query_params.append("directConnection=true")
+
+    return (
+        f"mongodb://{_env('MONGO_USERNAME', 'admin')}:"
+        f"{_env('MONGO_PASSWORD', 'password123')}@"
+        f"{_env('MONGO_HOST', 'localhost')}:"
+        f"{_env('MONGO_PORT', '27017')}/?{'&'.join(query_params)}"
+    )
+
+
+def _load_or_create_local_master_key(path: Path) -> bytes:
+    if path.exists():
+        data = path.read_bytes()
+        if len(data) != 96:
+            raise ValueError(f"Invalid master key length in {path}. Expected 96 bytes, got {len(data)}")
+        return data
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    master_key = os.urandom(96)
+    path.write_bytes(master_key)
+    return master_key
 
 
 def _chunks(total: int, batch_size: int):
@@ -69,6 +98,19 @@ def _ensure_collections(db) -> None:
             db.create_collection(collection_name)
 
 
+def _is_encrypted_field(db, collection_name: str, field_path: str) -> bool:
+    collection_info = next(
+        db.list_collections(filter={"name": collection_name}),
+        None,
+    )
+    if collection_info is None:
+        return False
+
+    encrypted_fields = collection_info.get("options", {}).get("encryptedFields", {})
+    fields = encrypted_fields.get("fields", [])
+    return any(field.get("path") == field_path for field in fields)
+
+
 def _ensure_indexes(db) -> None:
     asc = pymongo.ASCENDING
     desc = pymongo.DESCENDING
@@ -84,7 +126,10 @@ def _ensure_indexes(db) -> None:
     db.orders.create_index([("id_order", asc)], unique=True)
     db.order_items.create_index([("id_order_item", asc)], unique=True)
 
-    db.users.create_index([("email", asc)], unique=True)
+    if _is_encrypted_field(db, "users", "email"):
+        print("Skipping index users.email because field is encrypted (Queryable Encryption).")
+    else:
+        db.users.create_index([("email", asc)], unique=True)
     db.users.create_index([("id_role", asc)])
 
     db.models.create_index([("id_manufacturer", asc)])
@@ -249,11 +294,78 @@ def _insert_many(collection, documents: list[dict], batch_size: int) -> None:
         collection.insert_many(documents[start:end], ordered=False)
 
 
+def _build_kms_providers() -> dict:
+    master_key_path = Path(
+        _env(
+            "MONGO_QE_MASTER_KEY_PATH",
+            str((Path(__file__).resolve().parents[1] / ".mongo_qe_master_key.bin")),
+        )
+    )
+    local_master_key = _load_or_create_local_master_key(master_key_path)
+    return {"local": {"key": local_master_key}}
+
+def _build_client_encryption(client: pymongo.MongoClient) -> ClientEncryption:
+    return ClientEncryption(
+        kms_providers=_build_kms_providers(),
+        key_vault_namespace=_env("MONGO_QE_KEY_VAULT_NAMESPACE", "encryption.__keyVault"),
+        key_vault_client=client,
+        codec_options=CodecOptions(
+            uuid_representation=UuidRepresentation.STANDARD,
+            tz_aware=False,
+        ),
+    )
+
+
+def _get_key_id_from_alt_name(client: pymongo.MongoClient, key_alt_name: str):
+    key_vault_namespace = _env("MONGO_QE_KEY_VAULT_NAMESPACE", "encryption.__keyVault")
+    key_vault_db_name, key_vault_collection_name = key_vault_namespace.split(".", 1)
+    key_vault_collection = client[key_vault_db_name][key_vault_collection_name]
+    key_doc = key_vault_collection.find_one({"keyAltNames": key_alt_name}, {"_id": 1})
+    if key_doc is None:
+        raise ValueError(
+            f"Data key with alt name '{key_alt_name}' was not found in key vault '{key_vault_namespace}'. "
+            "Run setup_mongodb_queryable_encryption.py first."
+        )
+    return key_doc["_id"]
+
+
+def _encrypt_unindexed_value(client_encryption: ClientEncryption, value, key_id):
+    return client_encryption.encrypt(
+        value,
+        algorithm=Algorithm.UNINDEXED,
+        key_id=key_id,
+    )
+
+
 def populate_database(size: int, batch_size: int, reset: bool, db_name: str | None = None) -> None:
     client = _connect()
+    client_encryption: ClientEncryption | None = None
     try:
         selected_db_name = db_name or _env("MONGO_DATABASE", "skates_shop")
         db = client[selected_db_name]
+
+        users_email_encrypted = _is_encrypted_field(db, "users", "email")
+        users_password_encrypted = _is_encrypted_field(db, "users", "password")
+        users_phone_encrypted = _is_encrypted_field(db, "users", "phone")
+        orders_shipping_address_encrypted = _is_encrypted_field(db, "orders", "shipping_address")
+
+        if users_email_encrypted or users_password_encrypted or users_phone_encrypted or orders_shipping_address_encrypted:
+            client_encryption = _build_client_encryption(client)
+            print(f"Using explicit encryption for encrypted fields in database: {selected_db_name}")
+
+        email_key_id = None
+        password_key_id = None
+        phone_key_id = None
+        shipping_address_key_id = None
+        if client_encryption is not None:
+            if users_email_encrypted:
+                email_key_id = _get_key_id_from_alt_name(client, _env("MONGO_QE_EMAIL_KEY_ALT_NAME", "skates_shop_email_key"))
+            if users_password_encrypted:
+                password_key_id = _get_key_id_from_alt_name(client, _env("MONGO_QE_PASSWORD_KEY_ALT_NAME", "skates_shop_password_key"))
+            if users_phone_encrypted:
+                phone_key_id = _get_key_id_from_alt_name(client, _env("MONGO_QE_PHONE_KEY_ALT_NAME", "skates_shop_phone_key"))
+            if orders_shipping_address_encrypted:
+                shipping_address_key_id = _get_key_id_from_alt_name(client, _env("MONGO_QE_SHIPPING_ADDRESS_KEY_ALT_NAME", "skates_shop_shipping_address_key"))
 
         _ensure_collections(db)
         if _is_without_indexes_database(selected_db_name):
@@ -366,30 +478,41 @@ def populate_database(size: int, batch_size: int, reset: bool, db_name: str | No
 
         user_docs: list[dict] = []
         for user_id in user_ids:
-            user_docs.append(
-                {
-                    "id_user": user_id,
-                    "username": f"user_{run_tag}_{user_id}",
-                    "email": f"{run_tag}-u-{user_id}@bench.local",
-                    "password": "hashed_password",
-                    "phone": f"+48{random.randint(500000000, 999999999)}",
-                    "id_role": random.choice([1, 2]),
-                }
-            )
+            user_doc = {
+                "id_user": user_id,
+                "username": f"user_{run_tag}_{user_id}",
+                "email": f"{run_tag}-u-{user_id}@bench.local",
+                "password": "hashed_password",
+                "phone": f"+48{random.randint(500000000, 999999999)}",
+                "id_role": random.choice([1, 2]),
+            }
+            if client_encryption is not None:
+                if users_email_encrypted:
+                    user_doc["email"] = _encrypt_unindexed_value(client_encryption, user_doc["email"], email_key_id)
+                if users_password_encrypted:
+                    user_doc["password"] = _encrypt_unindexed_value(client_encryption, user_doc["password"], password_key_id)
+                if users_phone_encrypted:
+                    user_doc["phone"] = _encrypt_unindexed_value(client_encryption, user_doc["phone"], phone_key_id)
+            user_docs.append(user_doc)
         _insert_many(db.users, user_docs, batch_size)
 
         order_docs: list[dict] = []
         for order_id in order_ids:
-            order_docs.append(
-                {
-                    "id_order": order_id,
-                    "id_user": random.choice(user_ids) if user_ids else None,
-                    "id_status": random.randint(1, 5),
-                    "order_date": datetime.utcnow() - timedelta(days=random.randint(0, 3650)),
-                    "total_amount": round(random.uniform(50.0, 2500.0), 2),
-                    "shipping_address": f"{run_tag}-addr-{order_id}",
-                }
-            )
+            order_doc = {
+                "id_order": order_id,
+                "id_user": random.choice(user_ids) if user_ids else None,
+                "id_status": random.randint(1, 5),
+                "order_date": datetime.utcnow() - timedelta(days=random.randint(0, 3650)),
+                "total_amount": round(random.uniform(50.0, 2500.0), 2),
+                "shipping_address": f"{run_tag}-addr-{order_id}",
+            }
+            if client_encryption is not None and orders_shipping_address_encrypted:
+                order_doc["shipping_address"] = _encrypt_unindexed_value(
+                    client_encryption,
+                    order_doc["shipping_address"],
+                    shipping_address_key_id,
+                )
+            order_docs.append(order_doc)
         _insert_many(db.orders, order_docs, batch_size)
 
         order_item_docs: list[dict] = []
@@ -406,6 +529,8 @@ def populate_database(size: int, batch_size: int, reset: bool, db_name: str | No
         _insert_many(db.order_items, order_item_docs, batch_size)
 
     finally:
+        if client_encryption is not None:
+            client_encryption.close()
         client.close()
 
 
