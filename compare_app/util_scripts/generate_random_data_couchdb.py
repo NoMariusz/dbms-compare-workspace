@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import importlib.util
 import json
 import os
 import random
@@ -9,6 +10,21 @@ from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any
 from urllib import error, request
+
+project_root = Path(__file__).resolve().parents[1]
+connectors_dir = project_root / "connectors"
+_couch_encryption_path = connectors_dir / "couch_encryption.py"
+_couch_encryption_spec = importlib.util.spec_from_file_location("couch_encryption", _couch_encryption_path)
+if _couch_encryption_spec is None or _couch_encryption_spec.loader is None:
+    raise ImportError(f"Failed to load couch_encryption module from: {_couch_encryption_path}")
+_couch_encryption = importlib.util.module_from_spec(_couch_encryption_spec)
+_couch_encryption_spec.loader.exec_module(_couch_encryption)
+
+COUCHDB_ENCRYPTED_DB_NAME = _couch_encryption.COUCHDB_ENCRYPTED_DB_NAME
+COUCHDB_ENCRYPTED_PREFIX = _couch_encryption.COUCHDB_ENCRYPTED_PREFIX
+COUCHDB_SENSITIVE_FIELDS_BY_COLLECTION = _couch_encryption.COUCHDB_SENSITIVE_FIELDS_BY_COLLECTION
+CouchFieldCrypto = _couch_encryption.CouchFieldCrypto
+build_couch_encryption_key = _couch_encryption.build_couch_encryption_key
 
 INDEX_DEFINITIONS = [
     {"name": "idx_user_roles_id_role", "fields": ["type", "id_role"]},
@@ -45,6 +61,40 @@ ENCRYPTED_INDEX_DEFINITIONS = [
     {"name": "idx_users_phone_token", "fields": ["type", "phone_token"]},
     {"name": "idx_orders_shipping_address_token", "fields": ["type", "shipping_address_token"]},
 ]
+
+
+def _is_encrypted_database(database_name: str) -> bool:
+    return database_name == COUCHDB_ENCRYPTED_DB_NAME
+
+
+def _build_crypto_for_database(database_name: str) -> CouchFieldCrypto | None:
+    if not _is_encrypted_database(database_name):
+        return None
+
+    key = build_couch_encryption_key(
+        admin_password=_env("COUCHDB_PASSWORD", "password123"),
+        database_name=database_name,
+        configured_key=os.getenv("COUCHDB_ENCRYPTION_KEY"),
+    )
+    return CouchFieldCrypto(
+        encryption_key=key,
+        encrypted_prefix=COUCHDB_ENCRYPTED_PREFIX,
+        sensitive_fields_by_collection=COUCHDB_SENSITIVE_FIELDS_BY_COLLECTION,
+    )
+
+
+def _transform_docs_for_storage(
+    docs: list[dict[str, Any]],
+    collection_name: str,
+    crypto: CouchFieldCrypto | None,
+) -> list[dict[str, Any]]:
+    if crypto is None:
+        return docs
+
+    return [
+        crypto.transform_document_for_storage(collection_name=collection_name, document=document)
+        for document in docs
+    ]
 
 
 def _load_env(path: Path) -> None:
@@ -133,7 +183,7 @@ def _ensure_indexes(database_name: str) -> None:
             fields=index_definition["fields"],
         )
 
-    if database_name.endswith("_encrypted"):
+    if _is_encrypted_database(database_name):
         for index_definition in ENCRYPTED_INDEX_DEFINITIONS:
             _create_index(
                 database_name=database_name,
@@ -342,6 +392,7 @@ def _build_backup_payload(database_name: str) -> dict[str, Any]:
 
 def populate_database(size: int, batch_size: int, reset: bool, database_name: str | None = None) -> None:
     selected_database_name = database_name or _env("COUCHDB_DB", "skates_shop")
+    crypto = _build_crypto_for_database(selected_database_name)
 
     _ensure_database_exists(selected_database_name)
     if _is_without_indexes_database(selected_database_name):
@@ -389,7 +440,11 @@ def populate_database(size: int, batch_size: int, reset: bool, database_name: st
                 "name": f"Manufacturer {run_tag}-{manufacturer_id}",
             }
         )
-    _bulk_docs(selected_database_name, manufacturer_docs, chunk_size=batch_size)
+    _bulk_docs(
+        selected_database_name,
+        _transform_docs_for_storage(manufacturer_docs, "manufacturers", crypto),
+        chunk_size=batch_size,
+    )
 
     model_docs: list[dict[str, Any]] = []
     for model_id in model_ids:
@@ -405,7 +460,11 @@ def populate_database(size: int, batch_size: int, reset: bool, database_name: st
                 "release_date": datetime.combine(release_date, time.min).isoformat(),
             }
         )
-    _bulk_docs(selected_database_name, model_docs, chunk_size=batch_size)
+    _bulk_docs(
+        selected_database_name,
+        _transform_docs_for_storage(model_docs, "models", crypto),
+        chunk_size=batch_size,
+    )
 
     mapping_docs: list[dict[str, Any]] = []
     if model_ids and product_type_ids and mappings_count > 0:
@@ -426,7 +485,11 @@ def populate_database(size: int, batch_size: int, reset: bool, database_name: st
                     "id_type": pair[1],
                 }
             )
-    _bulk_docs(selected_database_name, mapping_docs, chunk_size=batch_size)
+    _bulk_docs(
+        selected_database_name,
+        _transform_docs_for_storage(mapping_docs, "models_to_product_types", crypto),
+        chunk_size=batch_size,
+    )
 
     specification_docs: list[dict[str, Any]] = []
     for specification_id in specification_ids:
@@ -442,7 +505,11 @@ def populate_database(size: int, batch_size: int, reset: bool, database_name: st
                 "bearing_type": random.choice(["ABEC-5", "ABEC-7", "ILQ-9"]),
             }
         )
-    _bulk_docs(selected_database_name, specification_docs, chunk_size=batch_size)
+    _bulk_docs(
+        selected_database_name,
+        _transform_docs_for_storage(specification_docs, "gear_specifications", crypto),
+        chunk_size=batch_size,
+    )
 
     product_docs: list[dict[str, Any]] = []
     for product_id in product_ids:
@@ -460,7 +527,11 @@ def populate_database(size: int, batch_size: int, reset: bool, database_name: st
                 "description": f"Generated product {run_tag}-{product_id}",
             }
         )
-    _bulk_docs(selected_database_name, product_docs, chunk_size=batch_size)
+    _bulk_docs(
+        selected_database_name,
+        _transform_docs_for_storage(product_docs, "product", crypto),
+        chunk_size=batch_size,
+    )
 
     user_docs: list[dict[str, Any]] = []
     for user_id in user_ids:
@@ -476,7 +547,11 @@ def populate_database(size: int, batch_size: int, reset: bool, database_name: st
                 "id_role": random.choice([1, 2]),
             }
         )
-    _bulk_docs(selected_database_name, user_docs, chunk_size=batch_size)
+    _bulk_docs(
+        selected_database_name,
+        _transform_docs_for_storage(user_docs, "users", crypto),
+        chunk_size=batch_size,
+    )
 
     order_docs: list[dict[str, Any]] = []
     for order_id in order_ids:
@@ -492,7 +567,11 @@ def populate_database(size: int, batch_size: int, reset: bool, database_name: st
                 "shipping_address": f"{run_tag}-addr-{order_id}",
             }
         )
-    _bulk_docs(selected_database_name, order_docs, chunk_size=batch_size)
+    _bulk_docs(
+        selected_database_name,
+        _transform_docs_for_storage(order_docs, "orders", crypto),
+        chunk_size=batch_size,
+    )
 
     order_item_docs: list[dict[str, Any]] = []
     for order_item_id in range(1, order_items_count + 1):
@@ -507,7 +586,11 @@ def populate_database(size: int, batch_size: int, reset: bool, database_name: st
                 "unit_price": round(random.uniform(40.0, 1000.0), 2),
             }
         )
-    _bulk_docs(selected_database_name, order_item_docs, chunk_size=batch_size)
+    _bulk_docs(
+        selected_database_name,
+        _transform_docs_for_storage(order_item_docs, "order_items", crypto),
+        chunk_size=batch_size,
+    )
 
 
 def export_backup(size_label: str, output_dir: Path, database_name: str | None = None) -> Path:

@@ -7,8 +7,11 @@ from pathlib import Path
 from typing import Any
 
 import config
+from bson import UuidRepresentation
+from bson.codec_options import CodecOptions
 from connectors.base import BaseConnector
 from constants import DBMSType
+from pymongo.encryption import Algorithm, ClientEncryption
 
 
 class MongoConnector(BaseConnector):
@@ -42,6 +45,8 @@ class MongoConnector(BaseConnector):
             self.auth_source = self.database_name
         self.database = None
         self._pymongo = None
+        self._client_encryption: ClientEncryption | None = None
+        self._encrypted_fields_by_collection: dict[str, dict[str, Any]] = {}
 
     def connect(self) -> None:
         self._pymongo = importlib.import_module("pymongo")
@@ -65,12 +70,115 @@ class MongoConnector(BaseConnector):
         self.client = self._pymongo.MongoClient(uri)
         self.client.admin.command("ping")
         self.database = self.client[self.database_name]
+        self._init_field_encryption()
 
     def close(self) -> None:
+        if self._client_encryption is not None:
+            self._client_encryption.close()
+            self._client_encryption = None
         if self.client:
             self.client.close()
             self.client = None
         self.database = None
+        self._encrypted_fields_by_collection = {}
+
+    def _load_or_create_local_master_key(self) -> bytes:
+        key_path = Path(
+            os.getenv(
+                "MONGO_QE_MASTER_KEY_PATH",
+                str((Path(__file__).resolve().parents[1] / ".mongo_qe_master_key.bin")),
+            )
+        )
+        if key_path.exists():
+            key_data = key_path.read_bytes()
+            if len(key_data) != 96:
+                raise ValueError(
+                    f"Invalid master key length in {key_path}. Expected 96 bytes, got {len(key_data)}"
+                )
+            return key_data
+
+        key_path.parent.mkdir(parents=True, exist_ok=True)
+        key_data = os.urandom(96)
+        key_path.write_bytes(key_data)
+        return key_data
+
+    def _init_field_encryption(self) -> None:
+        if self.client is None or self.database is None:
+            return
+
+        self._encrypted_fields_by_collection = {}
+        for collection_name in ("users", "orders"):
+            collection_info = next(
+                self.database.list_collections(filter={"name": collection_name}),
+                None,
+            )
+            if collection_info is None:
+                continue
+            encrypted_fields = collection_info.get("options", {}).get("encryptedFields")
+            if encrypted_fields is None:
+                continue
+            fields = encrypted_fields.get("fields", [])
+            self._encrypted_fields_by_collection[collection_name] = {
+                field["path"]: field["keyId"]
+                for field in fields
+                if isinstance(field, dict) and "path" in field and "keyId" in field
+            }
+
+        if not self._encrypted_fields_by_collection:
+            return
+
+        kms_providers = {"local": {"key": self._load_or_create_local_master_key()}}
+        key_vault_namespace = os.getenv("MONGO_QE_KEY_VAULT_NAMESPACE", "encryption.__keyVault")
+        codec_options = CodecOptions(
+            uuid_representation=UuidRepresentation.STANDARD,
+            tz_aware=False,
+        )
+        self._client_encryption = ClientEncryption(
+            kms_providers=kms_providers,
+            key_vault_namespace=key_vault_namespace,
+            key_vault_client=self.client,
+            codec_options=codec_options,
+        )
+
+    def _encrypt_write_value(self, collection_name: str, field_name: str, value: Any) -> Any:
+        if self._client_encryption is None:
+            return value
+        key_map = self._encrypted_fields_by_collection.get(collection_name)
+        if not key_map or field_name not in key_map:
+            return value
+        if value is None:
+            return value
+        return self._client_encryption.encrypt(
+            value,
+            algorithm=Algorithm.UNINDEXED,
+            key_id=key_map[field_name],
+        )
+
+    def _encrypt_document_for_insert(self, collection_name: str, document: dict[str, Any]) -> dict[str, Any]:
+        encrypted_document = dict(document)
+        for field_name in list(encrypted_document.keys()):
+            encrypted_document[field_name] = self._encrypt_write_value(
+                collection_name=collection_name,
+                field_name=field_name,
+                value=encrypted_document[field_name],
+            )
+        return encrypted_document
+
+    def _encrypt_update_query(self, collection_name: str, update_query: dict[str, Any]) -> dict[str, Any]:
+        encrypted_update = dict(update_query)
+        for operator in ("$set", "$setOnInsert"):
+            payload = encrypted_update.get(operator)
+            if not isinstance(payload, dict):
+                continue
+            updated_payload = dict(payload)
+            for field_name, value in updated_payload.items():
+                updated_payload[field_name] = self._encrypt_write_value(
+                    collection_name=collection_name,
+                    field_name=field_name,
+                    value=value,
+                )
+            encrypted_update[operator] = updated_payload
+        return encrypted_update
 
     def restore_data(self, size_label: str) -> None:
         print(f"DEBUG: Restoring {self.dbms_type.name} to size {size_label} using presets...")
@@ -183,20 +291,24 @@ class MongoConnector(BaseConnector):
             raise RuntimeError("PyMongo module is not initialized. Call connect() first.")
 
         try:
-            self._get_collection(collection_name).insert_one(dict(document))
+            self._get_collection(collection_name).insert_one(
+                self._encrypt_document_for_insert(collection_name, dict(document))
+            )
             return True
         except self._pymongo.errors.DuplicateKeyError:
             return False
 
     def insert_one(self, collection_name: str, document: dict[str, Any]) -> Any:
-        result = self._get_collection(collection_name).insert_one(dict(document))
+        result = self._get_collection(collection_name).insert_one(
+            self._encrypt_document_for_insert(collection_name, dict(document))
+        )
         return result.inserted_id
 
     def insert_many(self, collection_name: str, documents: list[dict[str, Any]], ordered: bool = True) -> list[Any]:
         if not documents:
             return []
         result = self._get_collection(collection_name).insert_many(
-            [dict(document) for document in documents],
+            [self._encrypt_document_for_insert(collection_name, dict(document)) for document in documents],
             ordered=ordered,
         )
         return list(result.inserted_ids)
@@ -263,7 +375,7 @@ class MongoConnector(BaseConnector):
     ) -> int:
         result = self._get_collection(collection_name).update_one(
             filter_query,
-            update_query,
+            self._encrypt_update_query(collection_name, update_query),
             upsert=upsert,
         )
         return int(result.modified_count)
@@ -277,7 +389,7 @@ class MongoConnector(BaseConnector):
     ) -> int:
         result = self._get_collection(collection_name).update_many(
             filter_query,
-            update_query,
+            self._encrypt_update_query(collection_name, update_query),
             upsert=upsert,
         )
         return int(result.modified_count)

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import base64
-import hashlib
-import hmac
 import json
 import os
 import time
@@ -12,16 +10,17 @@ from urllib import error, parse, request
 
 import config
 from connectors.base import BaseConnector
+from connectors.couch_encryption import (
+    COUCHDB_ENCRYPTED_DB_NAME, COUCHDB_ENCRYPTED_PREFIX,
+    COUCHDB_SENSITIVE_FIELDS_BY_COLLECTION, CouchFieldCrypto,
+    build_couch_encryption_key)
 from constants import DBMSType
 
 
 class CouchConnector(BaseConnector):
-    _ENCRYPTED_DB_NAME = "skates_shop_encrypted"
-    _ENCRYPTED_PREFIX = "enc::"
-    _SENSITIVE_FIELDS_BY_COLLECTION = {
-        "users": {"email", "password", "phone"},
-        "orders": {"shipping_address"},
-    }
+    _ENCRYPTED_DB_NAME = COUCHDB_ENCRYPTED_DB_NAME
+    _ENCRYPTED_PREFIX = COUCHDB_ENCRYPTED_PREFIX
+    _SENSITIVE_FIELDS_BY_COLLECTION = COUCHDB_SENSITIVE_FIELDS_BY_COLLECTION
 
     _ID_FIELD_BY_COLLECTION = {
         "user_roles": "id_role",
@@ -74,6 +73,11 @@ class CouchConnector(BaseConnector):
         self.is_encrypted_db = self.database_name == self._ENCRYPTED_DB_NAME
         self.is_without_indexes_db = self.database_name.endswith("_without_indexes")
         self._encryption_key = self._build_encryption_key()
+        self._crypto = CouchFieldCrypto(
+            encryption_key=self._encryption_key,
+            encrypted_prefix=self._ENCRYPTED_PREFIX,
+            sensitive_fields_by_collection=self._SENSITIVE_FIELDS_BY_COLLECTION,
+        )
         if self.database_name == "skates_shop_roles":
             self.user = os.getenv("COUCHDB_ROLES_DB_USER", "moderator_user")
             self.password = os.getenv("COUCHDB_ROLES_DB_PASSWORD", "moderator_password123")
@@ -91,99 +95,45 @@ class CouchConnector(BaseConnector):
         self.client = None
 
     def _build_encryption_key(self) -> bytes:
-        configured = os.getenv("COUCHDB_ENCRYPTION_KEY")
-        if configured:
-            return hashlib.sha256(configured.encode("utf-8")).digest()
-
-        base_material = f"{self.admin_password}:{self.database_name}"
-        return hashlib.sha256(base_material.encode("utf-8")).digest()
+        return build_couch_encryption_key(
+            admin_password=self.admin_password,
+            database_name=self.database_name,
+            configured_key=os.getenv("COUCHDB_ENCRYPTION_KEY"),
+        )
 
     def _is_sensitive_field(self, collection_name: str, field_name: str) -> bool:
-        return field_name in self._SENSITIVE_FIELDS_BY_COLLECTION.get(collection_name, set())
+        return self._crypto.is_sensitive_field(collection_name, field_name)
 
     def _token_field_name(self, field_name: str) -> str:
-        return f"{field_name}_token"
+        return self._crypto.token_field_name(field_name)
 
     def _make_token(self, value: Any) -> str:
-        normalized = str(value).encode("utf-8")
-        digest = hmac.new(self._encryption_key, normalized, hashlib.sha256).hexdigest()
-        return digest
+        return self._crypto.make_token(value)
 
     def _encrypt_string(self, value: str) -> str:
-        if value.startswith(self._ENCRYPTED_PREFIX):
-            return value
-
-        value_bytes = value.encode("utf-8")
-        encrypted_bytes = bytes(
-            byte ^ self._encryption_key[index % len(self._encryption_key)]
-            for index, byte in enumerate(value_bytes)
-        )
-        encoded = base64.urlsafe_b64encode(encrypted_bytes).decode("ascii")
-        return f"{self._ENCRYPTED_PREFIX}{encoded}"
+        return self._crypto.encrypt_string(value)
 
     def _decrypt_string(self, value: str) -> str:
-        if not value.startswith(self._ENCRYPTED_PREFIX):
-            return value
-
-        encoded = value[len(self._ENCRYPTED_PREFIX):]
-        encrypted_bytes = base64.urlsafe_b64decode(encoded.encode("ascii"))
-        decrypted_bytes = bytes(
-            byte ^ self._encryption_key[index % len(self._encryption_key)]
-            for index, byte in enumerate(encrypted_bytes)
-        )
-        return decrypted_bytes.decode("utf-8")
+        return self._crypto.decrypt_string(value)
 
     def _transform_document_for_storage(self, collection_name: str, document: dict[str, Any]) -> dict[str, Any]:
         if not self.is_encrypted_db:
             return dict(document)
 
-        transformed = dict(document)
-        for field_name in self._SENSITIVE_FIELDS_BY_COLLECTION.get(collection_name, set()):
-            value = transformed.get(field_name)
-            if value is None:
-                continue
-            if not isinstance(value, str):
-                value = str(value)
-            plaintext_value = self._decrypt_string(value)
-            transformed[field_name] = self._encrypt_string(plaintext_value)
-            transformed[self._token_field_name(field_name)] = self._make_token(plaintext_value)
-
-        return transformed
+        return self._crypto.transform_document_for_storage(collection_name, document)
 
     def _transform_filter_for_storage(self, collection_name: str, filter_query: dict[str, Any]) -> dict[str, Any]:
         if not self.is_encrypted_db:
             return dict(filter_query)
 
-        transformed: dict[str, Any] = {}
-        for field_name, value in filter_query.items():
-            if not self._is_sensitive_field(collection_name, field_name):
-                transformed[field_name] = value
-                continue
-
-            token_field = self._token_field_name(field_name)
-            if isinstance(value, dict):
-                if "$eq" in value and value["$eq"] is not None:
-                    transformed[token_field] = self._make_token(value["$eq"])
-                else:
-                    transformed[field_name] = value
-                continue
-
-            transformed[token_field] = self._make_token(value)
-
-        return transformed
+        return self._crypto.transform_filter_for_storage(collection_name, filter_query)
 
     def _transform_document_for_read(self, collection_name: str, document: dict[str, Any]) -> dict[str, Any]:
         transformed = dict(document)
         if not self.is_encrypted_db:
             return transformed
 
-        for field_name in self._SENSITIVE_FIELDS_BY_COLLECTION.get(collection_name, set()):
-            value = transformed.get(field_name)
-            if isinstance(value, str):
-                transformed[field_name] = self._decrypt_string(value)
-            transformed.pop(self._token_field_name(field_name), None)
-
-        return transformed
+        return self._crypto.transform_document_for_read(collection_name, transformed)
 
     def _apply_encryption_to_existing_documents(self) -> None:
         if not self.is_encrypted_db:

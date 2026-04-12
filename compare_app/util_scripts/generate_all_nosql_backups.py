@@ -105,8 +105,8 @@ def main() -> None:
             print("\n" + ">" * 68)
             print(f"Starting: db={db_name}, size={size} ({size_name})")
 
-            _generate_mongodb_backup(db_name=db_name, size=size, size_name=size_name, db_dir=db_dir)
-            # _generate_couchdb_backup(db_name=db_name, size=size, size_name=size_name, db_dir=db_dir)
+            # _generate_mongodb_backup(db_name=db_name, size=size, size_name=size_name, db_dir=db_dir)
+            _generate_couchdb_backup(db_name=db_name, size=size, size_name=size_name, db_dir=db_dir)
 
             print("<" * 68)
 
